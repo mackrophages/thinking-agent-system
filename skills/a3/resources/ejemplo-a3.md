@@ -4,7 +4,7 @@
 - **Coach / Revisor:** responsable de operaciones
 - **Versión:** 4 (2026-11-03)
 - **Etapa:** cerrar
-- **Contrato:** 2
+- **Contrato:** 3
 - **Objetivo que apoya:** recuperar el servicio en menos de 1 hora ante cualquier pérdida de datos
 
 ## 1. Contexto y Desperdicio (Muda) Observado
@@ -24,12 +24,12 @@
 
 ### Mapa del estado presente
 
-| Paso | Quién | Tiempo | Problema |
-| :--- | :--- | :--- | :--- |
-| 1. Volcar la base | `respaldo.sh` desde el programador | 25 a 35 min | `timeout 30m` corta los volcados largos |
-| 2. Comprimir | gzip en la misma tubería | lo que dure el volcado | termina bien aunque la entrada llegue cortada |
-| 3. Copiar al almacén | `rclone` | 4 min | copia el archivo cortado como si fuera bueno |
-| 4. Revisar | ningún componente | no ocurre | el fallo solo se ve al restaurar |
+| Paso | Quién | Tiempo | Problema | Fuente |
+| :--- | :--- | :--- | :--- | :--- |
+| 1. Volcar la base | `respaldo.sh` desde el programador | 25 a 35 min | `timeout 30m` corta los volcados largos | ejemplo-respaldo.log:2 |
+| 2. Comprimir | gzip en la misma tubería | lo que dure el volcado | termina bien aunque la entrada llegue cortada | ejemplo-respaldo.log:5 |
+| 3. Copiar al almacén | `rclone` | 4 min | copia el archivo cortado como si fuera bueno | ejemplo-respaldo.log:6 |
+| 4. Revisar | ningún componente | no ocurre | el fallo solo se ve al restaurar | ejemplo-respaldo.log:7 |
 
 ## 3. Meta y Criterio de Aceptación
 - **Meta:** 10 de 10 respaldos se restauran en la prueba diaria durante 2 semanas seguidas.
@@ -67,19 +67,19 @@
 ## 5. Contramedidas y Poka-Yoke
 | Opción | Causa | Nivel | Impacto | Esfuerzo | Cuadrante | Decisión | Predicción |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| O-1 `pipefail` y volcado por directorio en 4 hilos | A | raíz | alto | bajo (5 h) | Implementar | elegida | respaldos sin restaurar: de 3 de 10 a 0 de 10; duración: de 35 a 12 min |
-| O-2 Restauración de prueba diaria que avisa si falla | B | poka-yoke | alto | bajo (20 h) | Implementar | elegida | días con un respaldo inservible sin aviso: de 21 a 0 |
-| O-3 Respaldo continuo con réplica | A | raíz | alto | alto (más de 1 semana) | Desafío | después | duración del respaldo: de 35 min a menos de 5 min |
-| O-4 Subir el límite a 60 min | síntoma | curita | bajo | bajo (5 h) | Posible | descartada | aplaza el corte hasta que la base vuelva a crecer |
-| O-5 Copiar cada respaldo a dos almacenes | síntoma | curita | bajo | alto (1 semana) | Eliminar | descartada | duplica los archivos cortados |
+| O-1 `pipefail` y volcado por directorio en 4 hilos | A | raíz | alto | bajo (5 h) | Implementar | elegida | respaldos sin restaurar: de 3 de 10 a 0 de 10 (base: ejemplo-respaldo.log:1-2 con 4 hilos); duración: de 35 a 12 min |
+| O-2 Restauración de prueba diaria que avisa si falla | B | poka-yoke | alto | bajo (20 h) | Implementar | elegida | días con un respaldo inservible sin aviso: de 21 a 0 (base: prueba diaria tras el volcado nocturno) |
+| O-3 Respaldo continuo con réplica | A | raíz | alto | alto (más de 1 semana) | Desafío | después | duración del respaldo: de 35 min a menos de 5 min (base: corte instantáneo desde réplica sincronizada) |
+| O-4 Subir el límite a 60 min | síntoma | curita | bajo | bajo (5 h) | Posible | descartada | aplaza el corte hasta que la base vuelva a crecer (base: ejemplo-respaldo.log:4 con crecimiento de 1 GB por mes) |
+| O-5 Copiar cada respaldo a dos almacenes | síntoma | curita | bajo | alto (1 semana) | Eliminar | descartada | duplica los archivos cortados (base: ejemplo-respaldo.log:5-6 porque rclone copia la salida 0 sin verificar) |
 
 ### Mapa del estado futuro
 
-| Paso | Quién | Tiempo | Problema |
-| :--- | :--- | :--- | :--- |
-| 1. Volcar la base en 4 hilos; un corte se reporta como fallo | `respaldo.sh` con `pipefail` | 12 min | ninguno |
-| 2. Copiar al almacén | `rclone` | 4 min | ninguno |
-| 3. Restaurar en una base de prueba; si falla, avisa a la guardia | `restaurar-prueba.sh` | 15 min | ninguno |
+| Paso | Quién | Tiempo | Problema | Fuente |
+| :--- | :--- | :--- | :--- | :--- |
+| 1. Volcar la base en 4 hilos; un corte se reporta como fallo | `respaldo.sh` con `pipefail` | 12 min | ninguno | (base: volcado de 25 a 35 min repartido en 4 hilos (ejemplo-respaldo.log:2)) |
+| 2. Copiar al almacén | `rclone` | 4 min | ninguno | ejemplo-respaldo.log:6 |
+| 3. Restaurar en una base de prueba; si falla, avisa a la guardia | `restaurar-prueba.sh` | 15 min | ninguno | (base: restauración del volcado de 11 GB en base de prueba (ejemplo-respaldo.log:4)) |
 
 ## 6. Plan de Ejecución PDCA y Ventana de Despliegue
 | Paso | Acción | Responsable | Verificación |

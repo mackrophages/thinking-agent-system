@@ -2,7 +2,7 @@
 
 Este manual es para quien instala TAS por primera vez y quiere usarlo en su trabajo de todos los días. No hace falta haber leído nada antes. Va de lo simple a lo completo: qué es, cómo se instala, un caso entero de principio a fin, cada pieza por separado y qué hacer cuando algo falla.
 
-Los bloques de comandos marcados como ejecutables se probaron de verdad contra la versión 2.0.0. Corren tal cual, en una carpeta vacía, si defines antes la variable `TAS_REPO`.
+Los bloques de comandos marcados como ejecutables se probaron de verdad contra la versión 2.1.0. Corren tal cual, en una carpeta vacía, si defines antes la variable `TAS_REPO`.
 
 ## 1. Qué es TAS y qué cambia al instalarlo
 TAS (*Thinking Agent System*) es un plugin libre en español para agentes de código (Claude Code, Antigravity y OpenCode). Le enseña al agente a trabajar con el método Lean AgentOps: parar cuando algo falla, ir a mirar el lugar real antes de afirmar, pensar en una página antes de construir y dejar por escrito lo que se aprendió.
@@ -37,7 +37,6 @@ claude plugin marketplace add <ruta-a-tas>
 claude plugin install tas@tas
 ```
 Solo para una sesión, sin instalar nada: `claude --plugin-dir <ruta-a-tas>`. Antes de instalar puedes pedirle a Claude Code que revise que la carpeta es un plugin válido:
-
 <!-- ejecutable -->
 ```bash
 claude plugin validate "$TAS_REPO"
@@ -77,7 +76,7 @@ for s in a3 5-porques agent-ops gemba goldfish-observer kaizen ojos-frescos; do
   cp -r "$TAS_REPO/skills/$s" "$DEST_OC/skills/tas-$s"
   sed -i "s/^name: $s\$/name: tas-$s/" "$DEST_OC/skills/tas-$s/SKILL.md"
 done
-{ printf '<!-- TAS v2.0.0: reglas siempre activas, copia de rules/AGENTS.md del plugin -->\n\n'
+{ printf '<!-- TAS v2.1.0: reglas siempre activas, copia de rules/AGENTS.md del plugin -->\n\n'
   cat "$TAS_REPO/rules/AGENTS.md"; } > "$DEST_OC/AGENTS.md"
 python3 - "$DEST_OC" <<'PY'
 import pathlib, sys
@@ -116,7 +115,6 @@ Ver el plugin en la lista no alcanza: puede estar instalado y no haber inyectado
 > ¿Cuál es el tope de bytes del archivo de reglas siempre activas?
 
 Si está cargado, contesta **6.374 bytes** (es la última línea del archivo de reglas). Si dice que no lo sabe o inventa una cifra, las reglas no se cargaron: ve a "Problemas frecuentes". Puedes comprobar lo mismo sin agente:
-
 <!-- ejecutable -->
 ```bash
 peso=$(wc -c < "$TAS_REPO/rules/AGENTS.md")
@@ -132,7 +130,6 @@ Un problema inventado pero realista, que recorre las piezas en el orden en que s
 
 ### 3.1 El fallo
 Creamos el archivo y el script tal como están hoy, guardando la salida real en `salida-resumen.txt`:
-
 <!-- ejecutable -->
 ```bash
 cat > pedidos.csv <<'EOF'
@@ -156,14 +153,15 @@ with open(sys.argv[1], newline="", encoding="utf-8") as f:
             continue
 print(f"Pedidos: {pedidos}\nTotal: {suma:.2f}")
 EOF
-python3 resumen.py pedidos.csv | tee salida-resumen.txt
-echo "Filas de datos en el archivo: $(tail -n +2 pedidos.csv | wc -l)" | tee -a salida-resumen.txt
+{ time -p python3 resumen.py pedidos.csv; } > salida-resumen.txt 2> tiempo-resumen.txt
+{ time -p tail -n +2 pedidos.csv | wc -l; } > filas.tmp 2> tiempo-conteo.txt
+echo "Filas de datos en el archivo: $(cat filas.tmp)" >> salida-resumen.txt
+rm -f filas.tmp && cat salida-resumen.txt tiempo-resumen.txt
 ```
 Imprime `Pedidos: 4` y `Total: 130.50`, con 6 filas de datos. El script terminó sin error y dio una cifra, pero está corta. Esa es la peor clase de fallo: no avisa.
 
 ### 3.2 Parar y preguntar por qué (`5-porques`)
 Aquí entra la regla "parar para arreglar". No se corrige todavía; primero se entiende. Se le pide al agente: "usa `5-porques` con este fallo" (`/tas:5-porques` en Claude Code, `tas-5-porques` en Antigravity u OpenCode). Lo primero que hace es separar lo **verificado** de lo **supuesto** mirando el lugar real:
-
 <!-- ejecutable -->
 ```bash
 grep -n "try:" -A4 resumen.py
@@ -180,7 +178,7 @@ Hechos verificados: en `resumen.py` (líneas 6 a 10) el `except` salta la fila s
 La **curita** tentadora sería cambiar la coma por punto dentro del script: tapa el síntoma de hoy y deja vivo el mecanismo que calla los errores. La contramedida de raíz es que el resumen deje de callar, y el **poka-yoke** es una prueba que falle si las cuentas no cuadran. Como hay más de una causa posible y el arreglo no es trivial, esto merece un A3.
 
 ### 3.3 El A3, etapa por etapa (`a3`)
-El A3 no se llena de golpe: se avanza por etapas y cada una se revisa con el coach (quien pregunta, no escribe). Para un A3 propio se parte de `skills/a3/resources/plantilla-a3-interno.md`, que ya trae los títulos exactos que exige `validar-a3.py` (con tope de 160 líneas no vacías para que quepa en una página) y la línea `- **Contrato:** 2` en la cabecera (si un A3 anterior no declara `Contrato`, se valida con el contrato `1`). Con el contrato `2`, cada hecho de la sección 2 y cada fila `**Verificado**` de la sección 4 debe citar fuentes que se puedan abrir en una de **cuatro formas** (o varias separadas por `;` fuera de comillas invertidas): `ruta:N` o rango `ruta:N-M`, `` `comando` -> ruta ``, `https://...` o `evidencia: ruta` (relativas a la carpeta del A3 o a la raíz del proyecto con `.git` o `--raiz`). Etapa 1, **comprender**: solo contexto y hechos medidos.
+El A3 no se llena de golpe: se avanza por etapas y cada una se revisa con el coach (quien pregunta, no escribe). Para un A3 propio se parte de `skills/a3/resources/plantilla-a3-interno.md`, que ya trae los títulos exactos que exige `validar-a3.py` (con tope de 160 líneas no vacías para que quepa en una página) y la línea `- **Contrato:** 3` en la cabecera (los A3 con contrato `2` o sin línea `Contrato`, que usa el `1`, siguen validando igual). Con el contrato `3`, cada hecho de la sección 2 y cada fila `**Verificado**` de la sección 4 debe citar fuentes que se puedan abrir en una de **cuatro formas** (o varias separadas por `;` fuera de comillas invertidas): `ruta:N` o rango `ruta:N-M`, `` `comando` -> ruta ``, `https://...` o `evidencia: ruta` (relativas a la carpeta del A3 o a la raíz del proyecto con `.git` o `--raiz`); además, lleva los mapas de estado presente (sec. 2, desde `comprender`) y futuro (sec. 5, desde `proponer`), uno por sección y con columna `Fuente`, y cada predicción de la sección 5 declara su `base:`. Etapa 1, **comprender**: solo contexto y hechos medidos.
 
 <!-- ejecutable -->
 ```bash
@@ -190,7 +188,7 @@ cat > a3-resumen.md <<'EOF'
 - **Coach / Revisor:** responsable de contabilidad
 - **Versión:** 1 (2026-11-12)
 - **Etapa:** comprender
-- **Contrato:** 2
+- **Contrato:** 3
 
 ## 1. Contexto y Desperdicio (Muda) Observado
 - **Por qué importa ahora:** contabilidad cierra el día con el total de `resumen.py`; un total corto se descubre al conciliar con el banco, días después.
@@ -205,13 +203,18 @@ cat > a3-resumen.md <<'EOF'
 | El total informado es 130.50 y la suma real es 1393.00 | salida-resumen.txt:2; pedidos.csv:2-7 |
 - **Brecha:** de 2 de 6 pedidos descartados en silencio (medido) a 0 de 6 (meta) para el 2026-11-20
 
+### Mapa del estado presente
+| Paso | Quién | Tiempo | Problema | Fuente |
+| :--- | :--- | :--- | :--- | :--- |
+| Leer y sumar `pedidos.csv` | `resumen.py` | real en archivo | salta totales con coma sin avisar | tiempo-resumen.txt:1; resumen.py:6-10 |
+| Contar filas contra resumen | agente | real en archivo | solo miraba código 0 sin cotejar | tiempo-conteo.txt:1; salida-resumen.txt:1-3 |
+
 ## Siguientes pasos
 - Pasar a la etapa analizar: meta, Ishikawa y porqués con el coach.
 EOF
 python3 "$TAS_REPO/skills/a3/scripts/validar-a3.py" a3-resumen.md
 ```
 El validador `validar-a3.py` lee la etapa y el contrato de la cabecera. Sus salidas: `0` aprobado, `1` rechazado (un `[PARAR LÍNEA]` es un error de pensamiento, incluido un dato sin fuente válida o un contrato inexistente) y `2` error de uso. Un `[AVISO]` es de forma y no rechaza. Si intentas saltarte una etapa, lo dice. Aquí le pedimos que exija la etapa siguiente y esperamos que rechace:
-
 <!-- ejecutable -->
 ```bash
 rc=0
@@ -227,7 +230,6 @@ Avisos de forma (1), no rechazan:
 Resultado: RECHAZADO (2 errores de pensamiento, 1 avisos de forma).
 ```
 Etapa 2, **analizar**: la meta y la causa raíz. Aquí van el **Ishikawa** (seis ramas: Método, Máquina, Material, Medición, Medio y Relevo; cada una queda en FOCO o DESCARTADA con su evidencia) y los porqués de cada causa en foco. Quitamos el cierre anterior, subimos la etapa y agregamos las secciones 3 y 4:
-
 <!-- ejecutable -->
 ```bash
 sed -i '/^## Siguientes pasos/,$d' a3-resumen.md
@@ -285,22 +287,27 @@ cat >> a3-resumen.md <<'EOF'
 ## 5. Contramedidas y Poka-Yoke
 | Opción | Causa | Nivel | Impacto | Esfuerzo | Cuadrante | Decisión | Predicción |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| O-1 El resumen cuenta lo descartado y sale con 1 si hay alguno | A | raíz | alto | bajo (5 h) | Implementar | elegida | pedidos descartados sin aviso: de 2 de 6 a 0 de 6 |
-| O-2 El formulario rechaza un total que no sea número con punto decimal | B | poka-yoke | alto | bajo (20 h) | Implementar | elegida | totales con coma que entran: de 2 de 6 a 0 de 6 |
-| O-3 `verificar.py` compara filas del archivo contra pedidos leídos | C | poka-yoke | alto | bajo (5 h) | Implementar | elegida | días con un resumen corto sin aviso: de 1 a 0 |
-| O-4 Cambiar la coma por punto dentro de `resumen.py` | síntoma | curita | bajo | bajo (5 h) | Posible | descartada | `1.250,00` pasa a `1.250.00` y sigue sin leerse |
-| O-5 Mover los pedidos a una base de datos con tipos | A | raíz | alto | alto (1 semana) | Desafío | después | totales ilegibles: de 2 de 6 a 0 de 6 |
+| O-1 El resumen cuenta lo descartado y sale con 1 si hay alguno | A | raíz | alto | bajo (5 h) | Implementar | elegida | pedidos descartados sin aviso: de 2 de 6 a 0 de 6 (base: pedidos.csv:3,5 tienen coma y resumen.py:6-10 los salta) |
+| O-2 El formulario rechaza un total que no sea número con punto decimal | B | poka-yoke | alto | bajo (20 h) | Implementar | elegida | totales con coma que entran: de 2 de 6 a 0 de 6 (base: supuesto en sección 4 de validar la entrada al capturar) |
+| O-3 `verificar.py` compara filas del archivo contra pedidos leídos | C | poka-yoke | alto | bajo (5 h) | Implementar | elegida | días con un resumen corto sin aviso: de 1 a 0 (base: salida-resumen.txt:1-3 muestra salida 0 con filas faltantes) |
+| O-4 Cambiar la coma por punto dentro de `resumen.py` | síntoma | curita | bajo | bajo (5 h) | Posible | descartada | `1.250,00` pasa a `1.250.00` y sigue sin leerse (base: pedidos.csv:5 trae punto de miles y coma decimal) |
+| O-5 Mover los pedidos a una base de datos con tipos | A | raíz | alto | alto (1 semana) | Desafío | después | totales ilegibles: de 2 de 6 a 0 de 6 (base: supuesto de esquema con columnas numéricas en base de datos) |
+
+### Mapa del estado futuro
+| Paso | Quién | Tiempo | Problema | Fuente |
+| :--- | :--- | :--- | :--- | :--- |
+| Sumar y fallar si descarta | `resumen.py` | similar al presente | formulario aún acepta coma | (base: tiempo-resumen.txt:1 y diseño O-1) |
+| Cotejar filas al cierre | `verificar.py` | similar al conteo base | ninguno | (base: tiempo-conteo.txt:1 y diseño O-3) |
 
 ## Siguientes pasos
 - Revisar las opciones con el coach y decidir cuáles pasan al plan: el agente de la tienda, 2026-11-14.
 EOF
 python3 "$TAS_REPO/skills/a3/scripts/validar-a3.py" a3-resumen.md
 ```
-El A3 completo sigue con las etapas **planear** (sección 6: pasos, responsables, ventana de despliegue) y **cerrar** (sección 7: predicho contra real). En este caso paramos en proponer y pasamos a arreglar, porque el cambio es pequeño y reversible. El archivo `skills/a3/resources/ejemplo-a3.md` del plugin (junto con `skills/a3/resources/ejemplo-respaldo.log`) es un A3 cerrado en contrato 2, para ver cómo termina.
+El A3 completo sigue con las etapas **planear** (sección 6: pasos, responsables, ventana de despliegue) y **cerrar** (sección 7: predicho contra real). En este caso paramos en proponer y pasamos a arreglar, porque el cambio es pequeño y reversible. El archivo `skills/a3/resources/ejemplo-a3.md` del plugin (junto con `skills/a3/resources/ejemplo-respaldo.log`) es un A3 cerrado en contrato 3, para ver cómo termina.
 
 ### 3.4 Ver el A3 dibujado (`dibujar-a3.py`)
 El Markdown es la fuente. Para verlo con el Ishikawa y la matriz PICK dibujados según el contrato de su cabecera, se genera una página HTML de un solo archivo, sin red, que abres con el navegador. Si cambias el A3, vuelve a generarla:
-
 <!-- ejecutable -->
 ```bash
 python3 "$TAS_REPO/skills/a3/scripts/dibujar-a3.py" a3-resumen.md -o a3-resumen.html
@@ -315,7 +322,6 @@ El revisor responde con `[PARAR LÍNEA]` cuando falta evidencia y con preguntas 
 
 ### 3.6 El arreglo: primero la prueba
 La prueba de control (`verificar.py`, opción O-3) se escribe antes del cambio. Comprueba que `resumen.py` salga con código 0 y que los pedidos leídos coincidan con las filas del archivo:
-
 <!-- ejecutable -->
 ```bash
 cat > verificar.py <<'EOF'
@@ -356,7 +362,6 @@ python3 resumen.py pedidos.csv || rc=$?
 test "$rc" -eq 1
 ```
 Ahora el fallo es visible: imprime `No se pudo leer el total de: 102, 104` y sale con 1. Guardamos una copia de `pedidos.csv` con comas (`pedidos-con-error.csv`) para seguir probando el bloqueo O-1, corregimos el archivo de hoy, verificamos el criterio del A3 (`Pedidos: 6`, `Total: 1393.00`, salida 0) y cerramos corriendo la compuerta `chequeo-gemba.sh` (que inspecciona Git, JSON, UTF-8, etiquetas `[SIN CONFIRMAR]` y valores duplicados en tablas):
-
 <!-- ejecutable -->
 ```bash
 cp pedidos.csv pedidos-con-error.csv
@@ -371,7 +376,6 @@ bash "$TAS_REPO/skills/gemba/scripts/chequeo-gemba.sh" .
 
 ### 3.7 El compromiso Kaizen y el hansei
 Una mejora que nadie vuelve a mirar se pierde. `kaizen` la anota como compromiso y fija tres cortes: a las 5 horas, a las 20 horas y a la semana. Primero se crea el tablero `KAIZEN.md` y se registra el compromiso de la opción O-1 con `--estado` para reflejar que ya quedó instalado. Como viene de un A3, hereda su cuadrante PICK (no se puntúa dos veces). El segundo compromiso no viene de un A3: se puntúa con `--impacto` y `--esfuerzo`, y al omitir `--estado` arranca con `0% ejecutado en el Gemba (pendiente primera ventana)` hasta que se actualice o se cierre:
-
 <!-- ejecutable -->
 ```bash
 KZ="$TAS_REPO/skills/kaizen/scripts/kaizen-cli.py"
@@ -384,7 +388,6 @@ python3 "$KZ" add-compromiso --file KAIZEN.md --id C-02 --inicio 2026-11-12T09:0
 ```
 
 `status` muestra los abiertos ordenados por cuadrante, su estado en el Gemba y en qué ventana va cada uno (`--now` fija la fecha de corte; sin ella usa la hora actual):
-
 <!-- ejecutable -->
 ```bash
 python3 "$TAS_REPO/skills/kaizen/scripts/kaizen-cli.py" status --file KAIZEN.md --now 2026-11-12T15:00
@@ -399,7 +402,6 @@ python3 "$TAS_REPO/skills/kaizen/scripts/kaizen-cli.py" status --file KAIZEN.md 
 ```
 
 Pasadas las ventanas, se mira en el lugar real si la mejora se sostuvo y se cierra con el **hansei** (la reflexión): qué funcionó y por qué, qué no funcionó y por qué. Un cierre sin reflexión no sirve:
-
 <!-- ejecutable -->
 ```bash
 KZ="$TAS_REPO/skills/kaizen/scripts/kaizen-cli.py"
@@ -417,7 +419,6 @@ Un skill se usa de dos maneras: por su nombre ("usa `/tas:a3` para este cambio" 
 - **Cuándo:** antes de diagnosticar un fallo, antes de confiar en la bitácora o el resumen de otro agente, y antes de dar algo por terminado.
 - **Qué entrega:** una verificación hecha en el lugar real: procesos, datos y estado del repositorio; entregables HTML abiertos en un navegador sin red; páginas de manuales PDF renderizadas como imagen; listas de chequeo con criterio de aceptación y no solo "revisar X".
 - **Comando:** `chequeo-gemba.sh [directorio-o-archivo]`. Revisa Git, JSON válidos, codificación UTF-8, marcadores `[SIN CONFIRMAR]` y valores repetidos sospechosos en tablas. Úsalo antes de entregar. Sale con 2 si la ruta no existe:
-
 <!-- ejecutable -->
 ```bash
 bash "$TAS_REPO/skills/gemba/scripts/chequeo-gemba.sh" .
@@ -433,7 +434,9 @@ test "$rc" -eq 2
 ### 4.3 `a3`
 - **Cuándo:** un problema no trivial (brecha medida con más de una hipótesis, o decisión difícil de revertir). Si la causa es evidente y el cambio es barato y reversible, se hace y se registra.
 - **Qué entrega:** un documento de una página por etapas (`comprender`, `analizar`, `proponer`, `planear`, `cerrar`), con su vocabulario cerrado en `skills/a3/references/contrato-a3.json`.
-- **Comandos y fuentes:** `validar-a3.py [--etapa ETAPA] [--raiz CARPETA] <a3.md>` y `dibujar-a3.py`. La plantilla (`resources/plantilla-a3-interno.md`, máx. 160 líneas no vacías) declara `- **Contrato:** 2`: toda fuente de la sección 2 y toda fila `**Verificado**` de la sección 4 debe usar `ruta:N` (o `ruta:N-M`), `` `comando` -> ruta ``, `https://...` o `evidencia: ruta` (separables con `;`), resueltas contra la carpeta del A3 y la raíz del proyecto (`.git` o `--raiz`). Sin línea `Contrato`, se aplica el contrato `1`. Las preguntas del coach están en `references/preguntas-del-coach.md`.
+- **Comandos y fuentes:** `validar-a3.py [--etapa ETAPA] [--raiz CARPETA] <a3.md>` y `dibujar-a3.py`. La plantilla (`resources/plantilla-a3-interno.md`, máx. 160 líneas no vacías) declara `- **Contrato:** 3`: toda fuente de la sección 2 y toda fila `**Verificado**` de la sección 4 debe usar `ruta:N` (o `ruta:N-M`), `` `comando` -> ruta ``, `https://...` o `evidencia: ruta` (separables con `;`), resueltas contra la carpeta del A3 y la raíz del proyecto (`.git` o `--raiz`). Los A3 con contrato `2` o sin línea `Contrato` (contrato `1`) siguen validando igual. Las preguntas del coach están en `references/preguntas-del-coach.md`.
+
+En el contrato `3`, además de esas tablas, los dos mapas son obligatorios desde la etapa de su sección (`### Mapa del estado presente` en la sección 2 desde `comprender` y `### Mapa del estado futuro` en la sección 5 desde `proponer`), uno por sección, una sola tabla por título y nunca fuera de las secciones 2 y 5. Cada mapa lleva exactamente el encabezado `| Paso | Quién | Tiempo | Problema | Fuente |`: el mapa presente admite las cuatro formas o `[SIN MEDIR]` solo hasta `analizar`, el mapa futuro admite las cuatro formas o una `(base: de dónde sale)` sola en la celda, y toda predicción escrita en la sección 5 (sea `elegida`, `después` o `descartada`) declara al menos una `(base: texto)` en texto plano. El contrato 3 exige la forma exacta de la plantilla: un título, un encabezado, una fila o una base que se le parezca sin coincidir para la línea, y el mensaje dice la forma correcta.
 
 ### 4.4 `ojos-frescos`
 - **Cuándo:** después de redactar un A3, diagnóstico, jugada, plan o tabla técnica, y antes de aprobarlo.
@@ -443,7 +446,6 @@ test "$rc" -eq 2
 - **Cuándo:** al decidir una mejora (se anota) y en cada ventana de 5 horas, 20 horas y 1 semana (se revisa y se cierra).
 - **Qué entrega:** un `KAIZEN.md` con compromisos, mejoras registradas y jugadas.
 - **Comandos de `kaizen-cli.py`:** `init`, `add-compromiso` (también `add-ciclo`), `cerrar`, `status`, `add-kaizen` y `add-jugada`. Los cuatro primeros ya los usaste. Los dos que faltan:
-
 <!-- ejecutable -->
 ```bash
 KZ="$TAS_REPO/skills/kaizen/scripts/kaizen-cli.py"
@@ -491,7 +493,6 @@ El observador (Goldfish) mide el flujo del trabajo fuera de banda: no cuesta tok
 
 ### 6.1 Activarlo en un proyecto
 Solo observa los proyectos donde lo activas. Sin `.tas/`, sus hooks no hacen nada:
-
 <!-- ejecutable -->
 ```bash
 mkdir -p sin-observador
@@ -499,7 +500,6 @@ echo '{"tool_name":"Bash"}' | python3 "$TAS_REPO/scripts/goldfish_sensor.py" --p
 test ! -d sin-observador/.tas
 ```
 Para activarlo se corre `init` en la carpeta del proyecto:
-
 <!-- ejecutable -->
 ```bash
 python3 "$TAS_REPO/skills/goldfish-observer/scripts/observer_cli.py" init --project-dir . --project-name "Tienda en línea"
@@ -512,7 +512,6 @@ Con el observador activo, los hooks de Claude Code (después de cada herramienta
 
 ### 6.2 Corridas
 Una **corrida** (en el tablero, *Build*) es una unidad de trabajo completa, de un encargo a su entrega. Se abre y se cierra a mano:
-
 <!-- ejecutable -->
 ```bash
 OBS="$TAS_REPO/skills/goldfish-observer/scripts/observer_cli.py"
@@ -523,7 +522,6 @@ Al cerrar imprime el tiempo de ciclo (CT), los fallos de herramientas capturados
 
 ### 6.3 Problemas
 Hay dos tipos. Los de **calidad** (la meta es cero) tienen cuatro categorías: `Wrong Parts - Supplied` (contexto o datos de entrada obsoletos), `Wrong Parts - Built` (defecto al construir), `Wrong Parts - Designed` (herramienta o esquema ambiguo) y `Missing Parts` (falta un índice, una ruta o un comando). Los de **entrega** (flujo) solo se registran ante causa especial o patrón; sus categorías son `CT > TT` y `CT > Standard`, y llevan el tipo de desperdicio (`--muda`):
-
 <!-- ejecutable -->
 ```bash
 OBS="$TAS_REPO/skills/goldfish-observer/scripts/observer_cli.py"
@@ -538,7 +536,6 @@ grep -F "Pendiente (Meta: 0 Issues | CT <= Standard)" .tas/READINESS_BOARD.md
 
 ### 6.4 Actualizar y abrir el tablero
 Cada `close-build`, `add-quality-issue`, `add-delivery-issue` e `import-goldfish` actualiza los dos tableros; `update-board` los sincroniza a mano cuando haga falta. El tablero en Markdown es `.tas/READINESS_BOARD.md`. El visual es `.tas/dashboard/index.html`, un único archivo HTML sin conexión a internet (generado con React 19 y TanStack desde `herramientas/tablero/`, donde `update-board` inyecta `window.BOARD_DATA` dentro de `<script id="board-data-script">`):
-
 <!-- ejecutable -->
 ```bash
 python3 "$TAS_REPO/skills/goldfish-observer/scripts/observer_cli.py" update-board --project-dir .
@@ -556,7 +553,6 @@ for s in "#encabezado" "#indicadores" "#corridas" "#calidad-entrega" "#pareto" "
 6. **Herramientas Lean (`#herramientas-lean`):** referencia fija leída al construir desde `rules/AGENTS.md` y `skills/a3/references/contrato-a3.json`: los 14 principios en cuatro bloques, los 5 principios Lean (`Valor`, `Cadena de valor`, `Flujo`, `Pull`, `Perfección`), el Ishikawa de seis ramas, la matriz PICK, las cinco etapas del A3 y qué skill usar en cada caso.
 
 **Para quien modifique el tablero (`herramientas/tablero/`):** no lo construyas nunca en la carpeta desde la que se instala el plugin, porque `pnpm install` crea `node_modules` y al instalar el plugin esa carpeta quedaría copiada junto a los skills. Trabaja en un clon aparte, instala las dependencias fijas con `pnpm install --frozen-lockfile`, prueba en otra ruta con `construir.mjs --salida <ruta>`, regenera `skills/goldfish-observer/resources/index.html` sin banderas y comprueba con `--comprobar` (sale con `0` si coincide byte a byte y con `1` si difiere):
-
 <!-- ejecutable -->
 ```bash
 mkdir -p clon-tablero/herramientas clon-tablero/rules clon-tablero/skills/a3/references clon-tablero/skills/goldfish-observer/resources
@@ -573,7 +569,6 @@ node clon-tablero/herramientas/tablero/construir.mjs --comprobar
 
 ### 6.5 Jugadas
 Una **jugada** rediseña un flujo: describe el estado presente (con su tiempo, su rendimiento y su desperdicio) y el estado futuro con el poka-yoke que lo sostiene. Mientras `kaizen-cli.py add-jugada` (sección 4.5) anota una fila resumida en `KAIZEN.md`, `observer_cli.py create-jugada` crea el documento VSM completo en `.tas/jugadas/`:
-
 <!-- ejecutable -->
 ```bash
 python3 "$TAS_REPO/skills/goldfish-observer/scripts/observer_cli.py" create-jugada --project-dir . --id J-02 \
@@ -583,7 +578,6 @@ ls .tas/jugadas
 
 ### 6.6 Analizar una conversación
 `observer_cli.py analyze-transcript --transcript <sesion.jsonl>` lee el archivo de una sesión y calcula, fuera de banda, el rendimiento a la primera (FTY), el tiempo, la relación de contexto inflado (CBR) y la eficiencia del proceso (PCE). Cuando los hooks del sensor están activos, la ruta del transcript queda anotada en `.tas/gemba_trace.jsonl` (`transcript_path`). Acepta `--format markdown` (por defecto) o `--format json`. Si el archivo indicado no existe, sale con código `1` e imprime `[PARAR LÍNEA] No existe el archivo: ...` (o `"available": false` en JSON) sin inventar cifras:
-
 <!-- ejecutable -->
 ```bash
 OBS="$TAS_REPO/skills/goldfish-observer/scripts/observer_cli.py"
@@ -600,7 +594,6 @@ test "$rc" -eq 1
 | 2 | El subagente local `observador-goldfish` | Si no defines esa variable |
 
 `prepare-goldfish` arma el encargo para el observador y escribe `.tas/encargo_goldfish.md`. Solo lleva la traza cruda, sin la opinión del agente. Sin configuración, indica usar el subagente local:
-
 <!-- ejecutable -->
 ```bash
 python3 "$TAS_REPO/skills/goldfish-observer/scripts/observer_cli.py" prepare-goldfish --project-dir .
@@ -614,7 +607,6 @@ Para el despacho remoto se usan **dos variables de entorno**:
 - **Nota de compatibilidad (una versión):** cuando falta o está vacía una variable `TAS_*`, se lee la anterior (`LEAN_PROJECT_DIR`, `LEAN_STANDARD_MIN`, `LEAN_TAKT_MIN`, `LEAN_AUTO_CLOSE_ON_STOP`, `LEAN_GOLDFISH_DESPACHO` y `LEAN_GOLDFISH_ARTEFACTO`); las carpetas `.lean_observer/` existentes siguen funcionando y `observer_cli.py init` las migra a `.tas/` si no hay corrida abierta (`active_build.json`).
 
 El comando de ejemplo `revisor-remoto` es inventado: pon el tuyo. `prepare-goldfish` **imprime** el comando ya con los huecos llenos; no lo ejecuta, lo copias y lo corres tú:
-
 <!-- ejecutable -->
 ```bash
 export TAS_GOLDFISH_DESPACHO='revisor-remoto enviar {encargo} {artefacto}'
@@ -625,7 +617,6 @@ python3 "$OBS" prepare-goldfish --project-dir . --artefacto "$PWD/otro.json" | g
 ```
 
 El revisor escribe un JSON con las listas `qualityLog` y/o `deliveryLog`, y `import-goldfish --project-dir . --artefacto <ruta.json>` lo importa al tablero. Valida cada fila con las mismas reglas que `add-quality-issue` y `add-delivery-issue` (`build` entero desde 1, categoría válida, `pdca` 1 a 4 y `who` componente técnico), agrega sin duplicar `(build, issue)`, actualiza ambos tableros, sale con `0` e imprime `[OK] Importado del revisor: X de calidad (Y ya estaban); W de entrega (Z ya estaban); R rechazadas.` listando debajo las filas rechazadas y su motivo. Si el archivo aún no existe, sale con `0` y `[AVISO] El revisor aún no escribió <ruta>: no hay nada que importar.`; si el JSON es inválido o no trae un objeto con las listas `qualityLog` y/o `deliveryLog`, sale con `2` y `[PARAR LÍNEA] <ruta> debe ser un objeto JSON con las listas qualityLog y/o deliveryLog.` (y si falta `.tas/`, sale con `1`):
-
 <!-- ejecutable -->
 ```bash
 OBS="$TAS_REPO/skills/goldfish-observer/scripts/observer_cli.py"
@@ -654,7 +645,6 @@ Cómo cambiarlas sin que engorden:
 5. **Las descripciones de los skills también se cargan.** Mantenlas cortas. Si el margen sale negativo, la regla no cabe: quita otra o muévela a un skill.
 
 Simulación de agregar una regla, sobre una copia (nunca sobre el original):
-
 <!-- ejecutable -->
 ```bash
 cp "$TAS_REPO/rules/AGENTS.md" reglas-copia.md

@@ -6,6 +6,43 @@ El repositorio público `thinking-agent-system` nace en la versión **2.0.0** co
 
 ---
 
+## [2.1.0] - 2026-11-14
+
+### Qué agrega el Contrato 3 en el A3
+
+El contrato 3 exige exactamente la forma de la plantilla. Lo que se le parezca sin coincidir para la línea (`[PARAR LÍNEA]`), y el mensaje muestra la forma correcta.
+
+- **Línea Contrato:** la etiqueta va exactamente así: `- **Contrato:** 3`, y es la puerta del contrato, así que estas reglas paran la línea en cualquier A3:
+  - una etiqueta de la cabecera que contiene "contrato" o se le parece por una errata (`- Contrato: 3`, `- **Contato:** 3`, `- **Versión del contrato:** 3`), también si la línea está comentada o dentro de un bloque de código de la cabecera;
+  - dos líneas Contrato;
+  - un A3 sin línea Contrato que trae rasgos del contrato 3 (un encabezado de tabla con `Paso` y `Fuente`, o una `(base:` en una predicción): "falta - **Contrato:** 3". El título del mapa solo no es rasgo, porque los A3 de contrato 1 y 2 también lo usan.
+  El valor lo sigue juzgando la comprobación de contratos existentes (`- **Contrato:** tres` dice que ese contrato no existe). La salida dice siempre qué contrato usó y de dónde lo sacó.
+- **Mapas obligatorios:** el mapa presente es obligatorio desde la etapa `comprender` y el futuro desde `proponer`, uno por sección, con una sola tabla bajo su título y nunca fuera de las secciones 2 y 5 (ni en la cabecera ni en una sección extra). Los únicos títulos son `### Mapa del estado presente`, en la sección 2, y `### Mapa del estado futuro`, en la sección 5. Debajo va una tabla con exactamente el encabezado `| Paso | Quién | Tiempo | Problema | Fuente |`; puede haber prosa entre el título y la tabla. Un título que se les parezca (otro nivel, numeración, otra redacción, negrita o cita), un título en la sección que no le toca, o una tabla con columnas `Paso` y `Fuente` fuera de esos títulos para la línea.
+- **Columna Fuente de los mapas:** en el mapa presente, una de las cuatro formas verificables (`ruta:N` o `ruta:N-M`, `` `comando` -> ruta ``, `https://...` o `evidencia: ruta`) o `[SIN MEDIR]`, que solo vale hasta la etapa `analizar`; desde `proponer` para la línea. En el mapa futuro, una de las cuatro formas o exactamente una `(base: de dónde sale)` sola en la celda.
+- **Base en cada predicción (`base_prediccion: "toda"`):** toda opción con `Predicción` escrita, sea su decisión `elegida`, `después` o `descartada`, declara al menos una base con la forma única `(base: texto)`: el paréntesis, `base:` en minúsculas pegado a él, el texto en texto plano (sin cursivas, negritas, tachado, comillas invertidas, HTML, imágenes, enlaces ni barras de escape) y el paréntesis que cierra; se admiten paréntesis anidados si están balanceados. Cualquier otra forma de escribir `base:` para la línea con "escribe la base así: (base: de dónde sale)". `línea base` es prosa y no cuenta como base.
+- **Qué texto de base no vale:** el vacío, el relleno (`-`, `--`, `pendiente`, `por definir`, `por medir`, `por confirmar`, `sin fuente`, `ninguna`, `n/a`, `no aplica`, `a definir`, `por determinar`, `por estimar`, `sin dato`, `sin base`, `xx`, `idem` y los demás de la lista, con sus plurales y femeninos) y el que empieza con una marca de dato no medido (`[SIN MEDIR]`, `sin medir`, `sin medida`, `sin medición`, `no medido`, `aún sin medir`, `todavía sin medir` o `se medirá`). Tampoco valen los textos de ejemplo de la plantilla y de los mensajes (`de dónde sale`, `texto`, `medición o supuesto`): quien los deja sin cambiar no dijo de dónde sale la cifra. Se compara en minúsculas, sin tildes y sin puntuación.
+- **Filas de tabla:** toda fila va con `|` al principio y al final, dentro de una tabla con encabezado y separador. Una fila fuera de tabla (tras una línea en blanco, tras una línea sin barras o dentro de una cita), o una línea con barras pegada a una tabla sin las barras de los extremos, para la línea. Los bloques de código se reconocen como en GFM: una cerca empieza la línea y no lleva otra comilla invertida detrás. En la sección 5, toda tabla que empiece con `Opción` lleva exactamente las columnas de opciones del contrato.
+- **Fuentes en un A3 de contrato 3:** `https://` exige un servidor con al menos un punto y una terminación de letras (`https://x` se rechaza), y una fuente que apunta al mismo A3 que se valida se rechaza por autocita. En el contrato 2 estas dos reglas no se aplican, para que valide igual que en la 2.0.0.
+
+### Compatibilidad y adopción
+
+- **Contratos anteriores:** los A3 con `- **Contrato:** 1` (o sin línea `Contrato`) y con `- **Contrato:** 2` siguen validando y dibujándose igual que en la versión 2.0.0.
+- **Plantilla y ejemplo:** `skills/a3/references/contrato-a3.json` fija `"vigente": 3`; `skills/a3/resources/plantilla-a3-interno.md` y `skills/a3/resources/ejemplo-a3.md` nacen con `- **Contrato:** 3`, mapas de cinco columnas con `Fuente` y predicciones con `base:`. `skills/a3/SKILL.md` y `docs/manual.md` documentan estas reglas.
+
+### Medida verificada
+
+- Al validar con `- **Contrato:** 3` el A3 de prueba de la fase 1, `validar-a3.py` bloquea sus **3 hallazgos sin respaldo** (incluidos los tiempos de los dos mapas y la predicción sin `base:` que escapaban en contrato 2), frente a **2 de 3** bloqueados con el contrato 2.
+- Antes de publicar, revisiones en frío del lector, una con otra familia de modelo, encontraron formas de escribir lo mismo que se escapaban. Tolerar cada variante no convergía (8 casos corregidos dieron paso a 11 nuevos), y el contrato 3 pasó a exigir una sola forma. Con la forma única, lo que quedaba abierto era la puerta: un mapa o una línea Contrato tan distintos que el validador no los reconocía. Por eso los mapas pasaron a ser obligatorios y la línea Contrato se vigila. Todos esos casos paran ahora la línea y están cubiertos por pruebas.
+
+### Límites conocidos
+
+- La lista de relleno es finita: un sinónimo que no esté en ella pasa, y un texto de base real pero vago también. Lo atrapa la revisión en frío del A3 (skill `ojos-frescos`), no el validador.
+- El validador no abre la red: una dirección `https://` bien formada pero inventada pasa.
+- Con `--etapa`, manda la etapa pedida aunque sea anterior a la de la cabecera: un `[SIN MEDIR]` pasa con aviso y salida 0.
+- El validador es un poka-yoke contra errores honestos de quien copia la plantilla, no una barrera contra quien quiere esquivarlo a propósito (renombrar, esconder o reescribir una sección para que no se reconozca). Eso lo atrapa la revisión en frío.
+
+---
+
 ## [2.0.0] - 2026-11-13
 
 ### Por qué cambia a 2.0.0

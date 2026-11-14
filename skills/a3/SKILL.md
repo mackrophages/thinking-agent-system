@@ -58,7 +58,8 @@ tiempo es inventar la causa o la solución. Hasta cerrar, el documento termina c
 7. **Verificación (7):** predicho contra real, qué puede salir mal y cómo lo veremos, próxima revisión
    (el compromiso de `KAIZEN.md` si existe) y dónde quedó estandarizado.
 
-Los mapas de estado presente y futuro son opcionales; su forma está en el ejemplo. En el mapa futuro la
+En el contrato `3` los mapas de estado presente (sección 2, desde `comprender`) y futuro (sección 5, desde `proponer`) son obligatorios, uno por sección y nunca fuera de esas dos secciones; su forma de cinco columnas
+(`Paso | Quién | Tiempo | Problema | Fuente`) está en la plantilla y en el ejemplo. En el mapa futuro la
 columna `Problema` dice lo que todavía queda sin resolver en ese paso (`ninguno` si queda limpio); lo que
 cambia se escribe en el nombre del paso.
 
@@ -72,11 +73,17 @@ cambia se escribe en el nombre del paso.
    python3 <ruta-al-plugin>/skills/a3/scripts/validar-a3.py [--etapa ETAPA] <ruta-a-tu-a3.md>
    ```
    Sin `--etapa` se lee la etapa de la cabecera; `--raiz` fija la carpeta raíz del proyecto cuando no se
-   busca `.git`. Con `- **Contrato:** 2` (por defecto en la plantilla; sin línea `Contrato` se aplica el
-   contrato 1), cada fuente de la sección 2 y cada fila `**Verificado**` de la sección 4 debe usar una de
-   las cuatro formas (o varias separadas por `;`): `ruta:N` o rango `ruta:N-M`, `` `comando` -> ruta ``,
-   `https://...` o `evidencia: ruta`. `[PARAR LÍNEA]` rechaza (salida 1); `[AVISO]` no rechaza; la salida
-   2 es un error de uso. Se conserva el límite de 160 líneas no vacías y la detección del formato v1.1.1.
+   busca `.git`. Con `- **Contrato:** 3` (por defecto en la plantilla; sin línea `Contrato` se aplica el
+   contrato 1 y con `2` solo se revisan las secciones 2 y 4), cada fuente de la sección 2 y cada fila
+   `**Verificado**` de la sección 4 debe usar una de las cuatro formas (o varias separadas por `;`):
+   `ruta:N` o rango `ruta:N-M`, `` `comando` -> ruta ``, `https://...` o `evidencia: ruta`; la columna
+   `Fuente` del mapa presente exige las cuatro formas o `[SIN MEDIR]` (este último solo hasta `analizar`),
+   la del mapa futuro exige las cuatro formas o una `(base: de dónde sale)` sola en la celda, y cada
+   predicción de la sección 5 lleva al menos una `(base: texto)` en texto plano. El contrato 3 exige la
+   forma exacta de la plantilla (línea Contrato, títulos y encabezado de los mapas, filas con `|` al
+   principio y al final, la base): lo que se le parezca sin coincidir para la línea y el mensaje muestra
+   la forma correcta. `[PARAR LÍNEA]` rechaza (salida 1); `[AVISO]` no rechaza; la salida 2 es un
+   error de uso. Se conserva el límite de 160 líneas no vacías y la detección del formato v1.1.1.
 4. Para verlo dibujado (etapa, mapas, Ishikawa y matriz PICK en una página HTML de un solo archivo,
    sin red, que se abre en el teléfono o el navegador):
    ```bash

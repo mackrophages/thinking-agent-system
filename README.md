@@ -48,7 +48,7 @@ Lean también para el plugin: el contexto que se carga en cada sesión lo pagan 
 tas/
 ├── plugin.json                        # Manifiesto nativo para Antigravity (agy)
 ├── hooks.json                         # Hooks de ciclo de vida para Antigravity (PostToolUse, Stop)
-├── CHANGELOG.md                       # Historial de cambios y guía de migración a TAS 2.0.0
+├── CHANGELOG.md                       # Historial de cambios y guía de migración
 ├── .claude-plugin/
 │   ├── plugin.json                    # Manifiesto para Claude Code
 │   ├── marketplace.json               # Catálogo local para Claude Code (tas@tas)
@@ -79,7 +79,7 @@ tas/
     │       └── poka-yoke-niveles.md   # Escalera de poka-yoke, de aviso a bloqueo
     ├── a3/                            # A3 interno de 1 página por etapas
     │   ├── resources/
-    │   │   ├── plantilla-a3-interno.md  # Plantilla del A3 (Contrato 2)
+    │   │   ├── plantilla-a3-interno.md  # Plantilla del A3 (Contrato 3)
     │   │   ├── ejemplo-a3.md          # Un A3 lleno que pasa el validador
     │   │   └── ejemplo-respaldo.log   # Registro de respaldo citado por el ejemplo
     │   ├── references/
@@ -111,7 +111,7 @@ tas/
 
 ## Instalación
 
-Manual de uso, de la instalación a un caso completo: [`docs/manual.md`](./docs/manual.md). Cambios de la versión 2.0.0 y migración: [`CHANGELOG.md`](./CHANGELOG.md).
+Manual de uso, de la instalación a un caso completo: [`docs/manual.md`](./docs/manual.md). Cambios de la versión 2.1.0 y migración: [`CHANGELOG.md`](./CHANGELOG.md).
 
 El repositorio público es `thinking-agent-system` (`https://github.com/mackrophages/thinking-agent-system`). En los bloques siguientes, `<ruta-a-tas>` es la carpeta donde clonaste o copiaste este repositorio.
 
@@ -172,7 +172,7 @@ for s in a3 5-porques agent-ops gemba goldfish-observer kaizen ojos-frescos; do
   sed -i "s/^name: $s\$/name: tas-$s/" "$DEST_OC/skills/tas-$s/SKILL.md"
 done
 {
-  printf '<!-- TAS v2.0.0: reglas siempre activas, copia de rules/AGENTS.md del plugin -->\n\n'
+  printf '<!-- TAS v2.1.0: reglas siempre activas, copia de rules/AGENTS.md del plugin -->\n\n'
   cat "$REPO/rules/AGENTS.md"
 } > "$DEST_OC/AGENTS.md"
 python3 - "$DEST_OC" <<'PY'

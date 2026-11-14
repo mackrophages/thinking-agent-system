@@ -98,10 +98,16 @@ def _validar_entrada_contrato(ruta: Path, ver: str, c: object) -> None:
     reglas = c["reglas"]
     if not isinstance(reglas, dict) or any(k not in reglas for k in _CLAVES_REGLAS):
         _fallar_contrato_json(ruta, "faltan claves obligatorias en 'reglas'")
+    for clave_txt in ("fuente_mapa", "base_prediccion"):
+        if reglas.get(clave_txt) is not None and (
+            not isinstance(reglas[clave_txt], str) or not reglas[clave_txt]
+        ):
+            _fallar_contrato_json(ruta, f"'{clave_txt}' en 'reglas' debe ser texto no vacío o null")
+    if reglas.get("sin_medir_hasta") is not None and reglas["sin_medir_hasta"] not in c["etapas"]:
+        _fallar_contrato_json(ruta, "'sin_medir_hasta' debe ser una etapa válida del contrato")
 
 
-def cargar_contrato(numero: int | None = None) -> dict:
-    """Lee skills/a3/references/contrato-a3.json y devuelve el diccionario del contrato pedido."""
+def _leer_datos_contrato_json() -> dict:
     ruta = Path(__file__).resolve().parent.parent / "references" / "contrato-a3.json"
     try:
         crudo = ruta.read_text(encoding="utf-8")
@@ -126,6 +132,25 @@ def cargar_contrato(numero: int | None = None) -> dict:
         _fallar_contrato_json(ruta, f"la versión vigente '{vigente}' no existe en 'versiones'")
     for ver, entrada in versiones.items():
         _validar_entrada_contrato(ruta, str(ver), entrada)
+    return datos
+
+
+def _texto_versiones_validas(datos: dict | None = None) -> str:
+    cargado = datos if datos is not None else _leer_datos_contrato_json()
+    claves = sorted(
+        (str(k) for k in cargado["versiones"].keys()),
+        key=lambda k: (0, int(k)) if k.isdigit() else (1, k),
+    )
+    if len(claves) == 1:
+        return claves[0]
+    return f"{', '.join(claves[:-1])} y {claves[-1]}"
+
+
+def cargar_contrato(numero: int | None = None) -> dict:
+    """Lee skills/a3/references/contrato-a3.json y devuelve el diccionario del contrato pedido."""
+    datos = _leer_datos_contrato_json()
+    vigente = datos["vigente"]
+    versiones = datos["versiones"]
     clave = str(vigente) if numero is None else str(numero)
     return dict(versiones[clave])
 
@@ -144,6 +169,7 @@ MARCADOR_CORCHETE = re.compile(
     r"\[(?:RELLENAR|Título claro|Qué flujo|Qué proceso|Hecho comprobado|Nombre del|Acción concreta)[^\]\n]*\]?"
 )
 CAMPO = re.compile(r"^\s*[-*]\s*\*\*(.*?):\*\*\s*(.*)$")
+ETIQUETA_CONTRATO_EXACTA = re.compile(r"^- \*\*Contrato:\*\*(?: (.*))?$")
 BRECHA = re.compile(r"^\s*[-*]\s*\*\*Brecha:\*\*")
 CAUSA = re.compile(r"^\s*[-*]\s*\*\*\s*Causa\b([^*]*?):\*\*\s*(.*)$", re.IGNORECASE)
 PORQUE = re.compile(r"^\s*[-*]\s*\d+[a-z]?[.)]\s*\S")
@@ -209,17 +235,141 @@ PREFIJOS_RELLENO_FUENTE = (
     "pendiente", "por definir", "por medir", "por confirmar", "sin fuente", "no se", "no hay", "no tengo",
     "ninguna", "ninguno", "nada", "desconocid", "n/a", "tbd", "falta", "?",
 )
+NUMERACION_INICIAL_BASE = re.compile(r"^\s*\d+[.)](?:\s+|(?=[^\w\s]))")
+PREFIJOS_RELLENO_BASE = (
+    "pendiente",
+    "pendientes",
+    "por definir",
+    "por medir",
+    "por confirmar",
+    "sin fuente",
+    "sin fuentes",
+    "no se",
+    "no hay",
+    "no tengo",
+    "ningun",
+    "ninguno",
+    "ninguna",
+    "ningunos",
+    "ningunas",
+    "nada",
+    "nadas",
+    "desconocid",
+    "desconocido",
+    "desconocida",
+    "desconocidos",
+    "desconocidas",
+    "na",
+    "n a",
+    "tbd",
+    "tbds",
+    "falta",
+    "faltas",
+)
+PREFIJOS_SIN_MEDIR_BASE = (
+    "sin medir",
+    "sinmedir",
+    "sin medida",
+    "sin medidas",
+    "sin medicion",
+    "sin mediciones",
+    "no medido",
+    "no medida",
+    "no medidos",
+    "no medidas",
+    "aun sin medir",
+    "aun sin medida",
+    "aun sin medidas",
+    "aun sin medicion",
+    "aun sin mediciones",
+    "aun no medido",
+    "aun no medida",
+    "aun no medidos",
+    "aun no medidas",
+    "todavia sin medir",
+    "todavia sin medida",
+    "todavia sin medidas",
+    "todavia sin medicion",
+    "todavia sin mediciones",
+    "todavia no medido",
+    "todavia no medida",
+    "todavia no medidos",
+    "todavia no medidas",
+    "se medira",
+    "se mediran",
+)
+RELLENO_BASE_EXACTO = {
+    "",
+    "na",
+    "n a",
+    "pendiente",
+    "pendientes",
+    "por definir",
+    "sin fuente",
+    "sin fuentes",
+    "ningun",
+    "ninguno",
+    "ninguna",
+    "ningunos",
+    "ningunas",
+    "no aplica",
+    "no aplican",
+    "a definir",
+    "por determinar",
+    "por estimar",
+    "sin dato",
+    "sin datos",
+    "sin base",
+    "sin bases",
+    "xx",
+    "xxx",
+    "idem",
+    "idems",
+    # Textos de ejemplo de la plantilla, del skill y de los mensajes: quien los deja sin cambiar no dijo de dónde sale la cifra.
+    "de donde sale",
+    "texto",
+    "medicion o supuesto",
+}
 # "Fuente: X" dentro de una viñeta o una línea con rótulo (- **Fuente verificable:** X).
 FUENTE_EN_LINEA = re.compile(r"\bfuente\b[^:\n]{0,20}?:\**\s*(.*)$", re.IGNORECASE)
+SUBTITULO_H3 = re.compile(r"^\s*###(?!#)\s*(.+?)\s*$")
+TITULO_MD = re.compile(r"^\s*#{1,6}(?!#)(?:\s|$)")
+MAPA_ESTADO_H3 = re.compile(r"^Mapa\s+del\s+estado\s+(presente|futuro)\b", re.IGNORECASE)
+MARCA_SIN_MEDIR = re.compile(r"^\[\s*sin\s+medir\s*\]$", re.IGNORECASE)
+TITULO_MAPA_PRESENTE = "### Mapa del estado presente"
+TITULO_MAPA_FUTURO = "### Mapa del estado futuro"
+TABLA_MAPA_ENCABEZADO = ("Paso", "Quién", "Tiempo", "Problema", "Fuente")
+LINEA_TABLA_MAPA = "| Paso | Quién | Tiempo | Problema | Fuente |"
+LINEA_SOLA_ENFASIS_MAPA = re.compile(r"^\s*(\*{1,3}|_{1,3})(.+?)\1\s*:?\s*$")
+NUMERACION_TITULO_MAPA = re.compile(r"^(?:(?:\d+(?:\.\d+)*|[a-zA-Z])\s*[.):-]\s+)+")
+PALABRA_PREVIA_BASE = re.compile(
+    r"(?<![A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9])([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)$"
+)
+ENTIDAD_HTML_BASE = re.compile(r"&(?:[A-Za-z][A-Za-z0-9]*|#\d+|#[xX][0-9A-Fa-f]+);")
+ETIQUETA_HTML_EN_BASE = re.compile(r"<!--[\s\S]*?-->|</?[A-Za-z!/?][^<>]*>")
+GUION_BAJO_ADORNO_BASE = re.compile(
+    r"__|(?<![0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ])_|_(?![0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ])"
+)
+TACHADO_BASE = re.compile(r"~~|~[^\s~][^~]*~")
+APARICION_BASE_DOS_PUNTOS = re.compile(
+    r"(?<![0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ])"
+    r"b[*_~`\\]*a[*_~`\\]*s[*_~`\\]*e"
+    r"(?![0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ])"
+    r"(?:[\s*_~`\\]|</?[A-Za-z!/?][^<>]*>)*"
+    r"(?::|&#0*58;|&#[xX]0*3[aA];|&colon;)",
+    re.IGNORECASE,
+)
 
 
 @dataclass
 class Informe:
-    """Resultado de validar un A3: etapa usada, errores de pensamiento y avisos de forma."""
+    """Resultado de validar un A3: etapa usada, contrato usado, errores de pensamiento y avisos de forma."""
 
     etapa: str | None
     origen_etapa: str
     formato: str = "nuevo"
+    contrato: int | None = None
+    origen_contrato: str = ""
     errores: list[str] = field(default_factory=list)
     avisos: list[str] = field(default_factory=list)
 
@@ -323,15 +473,49 @@ def es_marcador_todo(texto: str, inicio: int, fin: int) -> bool:
     return TODO_ESPANOL_SIGUE.match(despues) is None
 
 
+def _es_apertura_cerca_gfm(linea: str) -> tuple[str, int] | None:
+    """Devuelve (carácter, longitud) si la línea abre una cerca de código según GFM, o None."""
+    m_bt = re.match(r"^ {0,3}(`{3,})([^`]*)$", linea)
+    if m_bt:
+        delim = m_bt.group(1)
+        return (delim[0], len(delim))
+    m_tl = re.match(r"^ {0,3}(~{3,})(.*)$", linea)
+    if m_tl:
+        delim = m_tl.group(1)
+        return (delim[0], len(delim))
+    return None
+
+
+def _es_cierre_cerca_gfm(linea: str, cerca: tuple[str, int]) -> bool:
+    """True si la línea cierra la cerca de código activa según GFM."""
+    m = re.match(r"^ {0,3}(`{3,}|~{3,})[ \t]*$", linea)
+    if m is None:
+        return False
+    delim = m.group(1)
+    return delim[0] == cerca[0] and len(delim) >= cerca[1]
+
+
+def _avanzar_cerca_gfm(
+    linea: str, cerca: tuple[str, int] | None
+) -> tuple[bool, tuple[str, int] | None]:
+    """Actualiza el estado de cerca GFM; devuelve (ignorar_linea, nueva_cerca)."""
+    if cerca is None:
+        apertura = _es_apertura_cerca_gfm(linea)
+        if apertura is not None:
+            return (True, apertura)
+        return (False, None)
+    if _es_cierre_cerca_gfm(linea, cerca):
+        return (True, None)
+    return (True, cerca)
+
+
 def marcadores(lineas: list[str]) -> list[str]:
     """Marcadores de plantilla sin completar, fuera de código en línea o cercado."""
     hallados: list[str] = []
-    en_codigo = False
+    cerca: tuple[str, int] | None = None
     for linea in lineas:
-        if linea.strip().startswith("```"):
-            en_codigo = not en_codigo
-            continue
-        if en_codigo:
+        ignorar, cerca = _avanzar_cerca_gfm(linea, cerca)
+        if ignorar:
             continue
         limpia = sin_codigo(linea)
         encontrados = marcadores_angulares(limpia)
@@ -409,15 +593,36 @@ def resolver_bases_fuentes(ruta_a3: Path, raiz: Path | None = None) -> tuple[Pat
     return (base_a3, base_raiz)
 
 
-def _candidatos_en_bases(ruta_str: str, bases: Sequence[Path]) -> list[Path]:
-    if (
+def _ruta_fuente_permitida(ruta_str: str) -> bool:
+    return not (
         not ruta_str
         or "\x00" in ruta_str
         or "`" in ruta_str
         or Path(ruta_str).is_absolute()
         or re.match(r"^[a-zA-Z]:", ruta_str)
         or ruta_str.startswith("\\\\")
-    ):
+    )
+
+
+def _apunta_a_mismo_a3(
+    ruta_str: str, bases: Sequence[Path], ruta_a3_resuelta: Path | None
+) -> bool:
+    if ruta_a3_resuelta is None or not _ruta_fuente_permitida(ruta_str):
+        return False
+    for base in bases:
+        try:
+            candidato = (base / ruta_str).resolve()
+            if not candidato.is_relative_to(base):
+                continue
+            if candidato == ruta_a3_resuelta:
+                return True
+        except (OSError, ValueError):
+            continue
+    return False
+
+
+def _candidatos_en_bases(ruta_str: str, bases: Sequence[Path]) -> list[Path]:
+    if not _ruta_fuente_permitida(ruta_str):
         return []
     candidatos: list[Path] = []
     for base in bases:
@@ -451,46 +656,151 @@ def _tiene_al_menos_lineas(ruta_archivo: Path, minimo: int) -> bool:
     return total >= minimo
 
 
-def _fuente_parte_valida(parte_cruda: str, bases: Sequence[Path]) -> bool:
+def _https_con_servidor_valido(url: str) -> bool:
+    if not re.fullmatch(r"https://\S+", url):
+        return False
+    resto = url[len("https://") :]
+    autoridad = re.split(r"[/?#]", resto, maxsplit=1)[0]
+    if not autoridad or "@" in autoridad:
+        return False
+    if ":" in autoridad:
+        servidor, puerto = autoridad.rsplit(":", 1)
+        if ":" in servidor or not puerto.isdigit():
+            return False
+        num_puerto = int(puerto)
+        if num_puerto < 1 or num_puerto > 65535:
+            return False
+    else:
+        servidor = autoridad
+    etiquetas = servidor.split(".")
+    if len(etiquetas) < 2:
+        return False
+    for etq in etiquetas[:-1]:
+        if not re.fullmatch(r"[^\W_](?:[^\W_]|-(?=[^\W_]))*", etq):
+            return False
+    return bool(re.fullmatch(r"[^\W\d_]{2,}", etiquetas[-1]))
+
+
+def _estado_fuente_parte(
+    parte_cruda: str,
+    bases: Sequence[Path],
+    *,
+    exigir_servidor: bool = True,
+    ruta_a3_resuelta: Path | None = None,
+) -> str:
     parte = parte_cruda.strip()
     m_cmd = re.match(r"^`([^`\n]+)`\s*->\s*(.+)$", parte)
     if m_cmd:
         if not m_cmd.group(1).strip():
-            return False
+            return "invalida"
         ruta_str = _quitar_comillas_exteriores(m_cmd.group(2))
-        return any(_pesa_mas_de_cero(c) for c in _candidatos_en_bases(ruta_str, bases))
+        if _apunta_a_mismo_a3(ruta_str, bases, ruta_a3_resuelta):
+            return "autocita"
+        return "valida" if any(_pesa_mas_de_cero(c) for c in _candidatos_en_bases(ruta_str, bases)) else "invalida"
 
     sin_comillas = _quitar_comillas_exteriores(parte)
     m_ev = re.match(r"^evidencia:(.*)$", sin_comillas, re.IGNORECASE)
     if m_ev:
         ruta_str = _quitar_comillas_exteriores(m_ev.group(1))
-        return any(_pesa_mas_de_cero(c) for c in _candidatos_en_bases(ruta_str, bases))
+        if _apunta_a_mismo_a3(ruta_str, bases, ruta_a3_resuelta):
+            return "autocita"
+        return "valida" if any(_pesa_mas_de_cero(c) for c in _candidatos_en_bases(ruta_str, bases)) else "invalida"
 
     if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", sin_comillas):
-        return bool(re.fullmatch(r"https://\S+", sin_comillas))
+        if exigir_servidor:
+            return "valida" if _https_con_servidor_valido(sin_comillas) else "invalida"
+        return "valida" if re.fullmatch(r"https://\S+", sin_comillas) else "invalida"
 
     m_linea = re.match(r"^(.+):(\d+)(?:-(\d+))?$", sin_comillas)
     if m_linea:
         ruta_str = _quitar_comillas_exteriores(m_linea.group(1))
+        if _apunta_a_mismo_a3(ruta_str, bases, ruta_a3_resuelta):
+            return "autocita"
         inicio = int(m_linea.group(2))
         fin = int(m_linea.group(3)) if m_linea.group(3) is not None else inicio
         if inicio < 1 or inicio > fin:
-            return False
-        return any(_tiene_al_menos_lineas(c, fin) for c in _candidatos_en_bases(ruta_str, bases))
+            return "invalida"
+        return (
+            "valida"
+            if any(_tiene_al_menos_lineas(c, fin) for c in _candidatos_en_bases(ruta_str, bases))
+            else "invalida"
+        )
 
-    return False
+    if _apunta_a_mismo_a3(sin_comillas, bases, ruta_a3_resuelta):
+        return "autocita"
+    return "invalida"
 
 
-def fuente_cuatro_formas_valida(valor: str, bases: Sequence[Path]) -> bool:
+def _fuente_parte_valida(
+    parte_cruda: str,
+    bases: Sequence[Path],
+    *,
+    exigir_servidor: bool = True,
+    ruta_a3_resuelta: Path | None = None,
+) -> bool:
+    return (
+        _estado_fuente_parte(
+            parte_cruda,
+            bases,
+            exigir_servidor=exigir_servidor,
+            ruta_a3_resuelta=ruta_a3_resuelta,
+        )
+        == "valida"
+    )
+
+
+def _estado_fuente_cuatro_formas(
+    valor: str,
+    bases: Sequence[Path],
+    *,
+    exigir_servidor: bool = True,
+    ruta_a3: Path | None = None,
+) -> str:
     if not valor.strip() or not tiene_texto_real(valor) or marcadores([valor]):
-        return False
+        return "invalida"
     clave = normalizar(valor).strip(" .,;:!¡¿?()[]")
     if clave in RELLENO_FUENTE or any(clave == p or clave.startswith(p + " ") for p in PREFIJOS_RELLENO_FUENTE):
-        return False
+        return "invalida"
     partes = _partir_fuentes(valor)
     if not partes:
-        return False
-    return all(_fuente_parte_valida(parte, bases) for parte in partes)
+        return "invalida"
+    ruta_a3_resuelta = Path(ruta_a3).resolve() if ruta_a3 is not None else None
+    estados = [
+        _estado_fuente_parte(
+            parte,
+            bases,
+            exigir_servidor=exigir_servidor,
+            ruta_a3_resuelta=ruta_a3_resuelta,
+        )
+        for parte in partes
+    ]
+    if all(e == "valida" for e in estados):
+        return "valida"
+    if "autocita" in estados:
+        return "autocita"
+    return "invalida"
+
+
+def fuente_cuatro_formas_valida(
+    valor: str,
+    bases: Sequence[Path],
+    *,
+    exigir_servidor: bool = True,
+    ruta_a3: Path | None = None,
+) -> bool:
+    return (
+        _estado_fuente_cuatro_formas(
+            valor,
+            bases,
+            exigir_servidor=exigir_servidor,
+            ruta_a3=ruta_a3,
+        )
+        == "valida"
+    )
+
+
+def mensaje_fuente_autocita(seccion: int, celda_fuente: str, hecho: str) -> str:
+    return f"sección {seccion}: en el hecho '{hecho}', la fuente apunta al mismo A3 ('{celda_fuente}')"
 
 
 def mensaje_fuente_invalida(seccion: int, celda_fuente: str, hecho: str) -> str:
@@ -499,6 +809,216 @@ def mensaje_fuente_invalida(seccion: int, celda_fuente: str, hecho: str) -> str:
         "no tiene una forma válida o no existe. "
         "Formas válidas: ruta:línea; `comando` -> ruta; https://...; evidencia: ruta."
     )
+
+
+def _fin_tramo_codigo(texto: str, inicio: int) -> tuple[int, int]:
+    """Para `texto[inicio] == '`'`, devuelve `(n_comillas, fin_exclusivo)` o `(n_comillas, -1)`."""
+    largo = len(texto)
+    n = 1
+    while inicio + n < largo and texto[inicio + n] == "`":
+        n += 1
+    j = inicio + n
+    while j < largo:
+        if texto[j] != "`":
+            j += 1
+            continue
+        m = 1
+        while j + m < largo and texto[j + m] == "`":
+            m += 1
+        if m == n:
+            return (n, j + m)
+        j += m
+    return (n, -1)
+
+
+def _tramos_codigo_en_linea(texto: str) -> tuple[list[bool], list[tuple[int, int, int]]]:
+    """Devuelve la máscara CommonMark de código en línea y la lista `(inicio, fin, n_comillas)`."""
+    en_codigo = [False] * len(texto)
+    tramos: list[tuple[int, int, int]] = []
+    i = 0
+    largo = len(texto)
+    while i < largo:
+        if texto[i] != "`":
+            i += 1
+            continue
+        n, cierre = _fin_tramo_codigo(texto, i)
+        if cierre != -1:
+            for k in range(i, cierre):
+                en_codigo[k] = True
+            tramos.append((i, cierre, n))
+            i = cierre
+        else:
+            i += n
+    return en_codigo, tramos
+
+
+def _mapa_codigo_en_linea(texto: str) -> list[bool]:
+    """Marca True en cada índice dentro de un tramo de código en línea según CommonMark."""
+    return _tramos_codigo_en_linea(texto)[0]
+
+
+def _es_texto_plano_base(texto: str) -> bool:
+    """True si el interior de (base: texto) es texto plano sin adornos, escapes, imágenes ni enlaces."""
+    if "*" in texto or "`" in texto or "\\" in texto:
+        return False
+    if "![" in texto or "](" in texto or "][" in texto:
+        return False
+    if GUION_BAJO_ADORNO_BASE.search(texto) or TACHADO_BASE.search(texto):
+        return False
+    if ETIQUETA_HTML_EN_BASE.search(texto) or ENTIDAD_HTML_BASE.search(texto):
+        return False
+    return True
+
+
+def _es_linea_base_prosa(texto: str, inicio_marca: int) -> bool:
+    """True solo cuando 'base:' forma parte de 'línea base' (con o sin tilde)."""
+    antes = texto[:inicio_marca].rstrip(" \t\xa0*_~`\\")
+    m = PALABRA_PREVIA_BASE.search(antes)
+    if m is None:
+        return False
+    descompuesto = unicodedata.normalize("NFKD", m.group(1))
+    palabra = "".join(c for c in descompuesto if not unicodedata.combining(c)).lower()
+    return palabra == "linea"
+
+
+def _cierre_parentesis_balanceado(texto: str, idx_abre: int) -> int | None:
+    """Desde texto[idx_abre] == '(', devuelve el índice de su ')' balanceado o None."""
+    prof = 0
+    for idx in range(idx_abre, len(texto)):
+        ch = texto[idx]
+        if ch == "(":
+            prof += 1
+        elif ch == ")":
+            prof -= 1
+            if prof == 0:
+                return idx
+    return None
+
+
+def _analizar_bases_prediccion(prediccion: str) -> tuple[str, list[str]]:
+    """Clasifica las apariciones de base en Predicción: ('sin_base'|'formato_invalido'|'ok', textos)."""
+    en_codigo = _mapa_codigo_en_linea(prediccion)
+    apariciones = [
+        m
+        for m in APARICION_BASE_DOS_PUNTOS.finditer(prediccion)
+        if not _es_linea_base_prosa(prediccion, m.start())
+    ]
+    if not apariciones:
+        return ("sin_base", [])
+
+    textos: list[str] = []
+    rangos: list[tuple[int, int]] = []
+    for m in apariciones:
+        ini = m.start()
+        if m.group(0) != "base:" or ini == 0 or prediccion[ini - 1] != "(":
+            return ("formato_invalido", [])
+        idx_abre = ini - 1
+        if en_codigo[idx_abre]:
+            return ("formato_invalido", [])
+        if idx_abre > 0 and prediccion[idx_abre - 1] in "*_~\\":
+            return ("formato_invalido", [])
+        idx_cierre = _cierre_parentesis_balanceado(prediccion, idx_abre)
+        if idx_cierre is None:
+            return ("formato_invalido", [])
+        if idx_cierre + 1 < len(prediccion) and prediccion[idx_cierre + 1] in "*_~":
+            return ("formato_invalido", [])
+        interior = prediccion[m.end() : idx_cierre]
+        if interior and not interior.startswith(" "):
+            return ("formato_invalido", [])
+        if not _es_texto_plano_base(interior):
+            return ("formato_invalido", [])
+        rangos.append((idx_abre, idx_cierre))
+        textos.append(interior)
+
+    for i, (a1, c1) in enumerate(rangos):
+        for j, (a2, _) in enumerate(rangos):
+            if i != j and a1 < a2 < c1:
+                return ("formato_invalido", [])
+    return ("ok", textos)
+
+
+def _analizar_base_celda_mapa_futuro(valor_fuente: str) -> tuple[str, str]:
+    """Evalúa si la celda Fuente del mapa futuro es exactamente una '(base: texto)' en texto plano."""
+    s = valor_fuente.strip()
+    if not s.startswith("(base:") or not s.endswith(")"):
+        return ("no_es_base_canonica", "")
+    idx_cierre = _cierre_parentesis_balanceado(s, 0)
+    if idx_cierre != len(s) - 1:
+        return ("no_es_base_canonica", "")
+    interior = s[len("(base:") : -1]
+    if interior and not interior.startswith(" "):
+        return ("no_es_base_canonica", "")
+    if not _es_texto_plano_base(interior):
+        return ("no_es_base_canonica", "")
+    for m in APARICION_BASE_DOS_PUNTOS.finditer(interior):
+        if not _es_linea_base_prosa(interior, m.start()):
+            return ("no_es_base_canonica", "")
+    return ("base_canonica", interior)
+
+
+def _analizar_bases_mapa_futuro(valor_fuente: str) -> tuple[str, list[str]]:
+    estado, interior = _analizar_base_celda_mapa_futuro(valor_fuente)
+    if estado == "base_canonica":
+        return ("base", [interior])
+    return ("no_es_base", [])
+
+
+def _analizar_base_mapa_futuro(valor_fuente: str) -> tuple[str, str | None]:
+    estado, interior = _analizar_base_celda_mapa_futuro(valor_fuente)
+    if estado == "base_canonica":
+        return ("base", interior)
+    return ("no_es_base", None)
+
+
+def _base_estimacion_valida(texto_base: str) -> bool:
+    if not _es_texto_plano_base(texto_base) or marcadores([texto_base]):
+        return False
+    sin_num = NUMERACION_INICIAL_BASE.sub("", texto_base)
+    if not sin_num or not tiene_texto_real(sin_num) or marcadores([sin_num]):
+        return False
+    descompuesto = unicodedata.normalize("NFKD", sin_num)
+    sin_acentos = "".join(c for c in descompuesto if not unicodedata.combining(c)).lower()
+    clave = " ".join(re.findall(r"[0-9a-z]+", sin_acentos))
+    if not clave or not re.search(r"[a-z]{2,}", clave):
+        return False
+    if any(clave == p or clave.startswith(p + " ") for p in PREFIJOS_SIN_MEDIR_BASE):
+        return False
+    if clave in RELLENO_BASE_EXACTO or any(
+        clave == p or clave.startswith(p + " ") for p in PREFIJOS_RELLENO_BASE
+    ):
+        return False
+    return True
+
+
+def _extraer_bases(texto: str) -> list[str | None]:
+    estado, textos = _analizar_bases_prediccion(texto)
+    if estado == "sin_base":
+        return []
+    if estado == "formato_invalido":
+        return [None]
+    return textos
+
+
+def _prediccion_tiene_base(prediccion: str) -> bool:
+    estado, textos = _analizar_bases_prediccion(prediccion)
+    return estado == "ok" and bool(textos) and all(_base_estimacion_valida(t) for t in textos)
+
+
+def _mensaje_error_base_prediccion(nombre: str, decision: str | None, prediccion: str) -> str | None:
+    etiqueta_dec = f"decisión: {decision}" if decision else "sin decisión válida"
+    prefijo = f"sección 5: {nombre} ({etiqueta_dec})"
+    estado, textos = _analizar_bases_prediccion(prediccion)
+    if estado == "sin_base":
+        return f"{prefijo}: su Predicción no lleva 'base:' (de dónde sale la estimación)"
+    if estado == "formato_invalido":
+        return f"{prefijo}: en su Predicción, escribe la base así: (base: de dónde sale)"
+    for b in textos:
+        if not _base_estimacion_valida(b):
+            return (
+                f"{prefijo}: en su Predicción, su base '{b.strip()}' no dice de dónde sale la estimación"
+                " (escribe '(base: de dónde sale)')"
+            )
+    return None
 
 
 def _hecho_de_vineta_fuente(linea: str, inicio_fuente: int) -> str:
@@ -602,13 +1122,23 @@ def es_separador(linea: str) -> bool:
     return bool(re.fullmatch(r"\s*\|?(\s*:?-+:?\s*\|)*\s*:?-+:?\s*\|?\s*", linea))
 
 
-def tablas(lineas: list[str]) -> list[Tabla]:
+def tablas(lineas: list[str], *, contrato_3: bool = False) -> list[Tabla]:
+    del contrato_3
     resultado: list[Tabla] = []
+    cerca: tuple[str, int] | None = None
     i = 0
     while i < len(lineas):
+        ignorar, cerca = _avanzar_cerca_gfm(lineas[i], cerca)
+        if ignorar:
+            i += 1
+            continue
         if lineas[i].strip().startswith("|"):
             bloque: list[str] = []
-            while i < len(lineas) and lineas[i].strip().startswith("|"):
+            while (
+                i < len(lineas)
+                and _es_apertura_cerca_gfm(lineas[i]) is None
+                and lineas[i].strip().startswith("|")
+            ):
                 bloque.append(lineas[i])
                 i += 1
             filas = [celdas(f) for f in bloque[1:] if not es_separador(f)]
@@ -616,6 +1146,438 @@ def tablas(lineas: list[str]) -> list[Tabla]:
         else:
             i += 1
     return resultado
+
+
+def _texto_candidato_titulo_mapa(linea: str) -> str | None:
+    """Devuelve el texto de un encabezado, línea con énfasis o cita candidato a título de mapa."""
+    m_hdr = re.match(r"^\s*#{1,6}(?!#)\s*(.+?)\s*$", linea)
+    if m_hdr:
+        return re.sub(r"[*_`~]+", "", m_hdr.group(1)).strip()
+    m_enf = LINEA_SOLA_ENFASIS_MAPA.match(linea)
+    if m_enf:
+        return re.sub(r"[*_`~]+", "", m_enf.group(2)).strip()
+    if re.match(r"^\s*>", linea):
+        sin_citas = re.sub(r"^(?:\s*>\s*)+", "", linea).strip()
+        if not sin_citas or sin_citas.startswith("|"):
+            return None
+        sin_hdr = re.sub(r"^#{1,6}(?!#)\s*", "", sin_citas)
+        return re.sub(r"[*_`~]+", "", sin_hdr).strip()
+    return None
+
+
+def _es_mencion_titulo_mapa(texto: str) -> str | None:
+    """Normaliza un candidato a título de mapa y devuelve la clave si nombra un mapa."""
+    sin_dos_puntos = texto.rstrip(":").strip()
+    sin_num = NUMERACION_TITULO_MAPA.sub("", sin_dos_puntos).strip()
+    clave = normalizar(sin_num)
+    if re.search(r"\bmapas?\b", clave) and re.search(r"\b(?:estado|presente|actual|futuro)s?\b", clave):
+        return clave
+    return None
+
+
+def _titulo_esperado_para_seccion(num_sec: int, clave_candidato: str = "") -> str:
+    if num_sec == 2:
+        return TITULO_MAPA_PRESENTE
+    if num_sec == 5:
+        return TITULO_MAPA_FUTURO
+    if "presente" in clave_candidato or "actual" in clave_candidato:
+        return TITULO_MAPA_PRESENTE
+    return TITULO_MAPA_FUTURO
+
+
+def _extras_en_etapa(doc: Documento, ultima: int) -> list[tuple[int, Seccion]]:
+    """Secciones extra (`## ...` sin número 1..7) situadas dentro del rango de la etapa actual."""
+    primera_futura = min((s.linea for n, s in doc.secciones.items() if n > ultima), default=None)
+    resultado: list[tuple[int, Seccion]] = []
+    for extra in doc.extras:
+        if normalizar(extra.titulo) == "siguientes pasos":
+            continue
+        if primera_futura is not None and extra.linea >= primera_futura:
+            continue
+        dueno = max((n for n, s in doc.secciones.items() if n <= ultima and s.linea < extra.linea), default=None)
+        if dueno is None:
+            dueno = 2 if "presente" in normalizar(extra.titulo) else 5
+        resultado.append((dueno, extra))
+    return resultado
+
+
+def _validar_titulos_mapa_c3(lineas: list[str], num_sec: int, informe: Informe) -> None:
+    """En contrato 3, todo título de mapa fuera del H3 exacto de su sección detiene la línea."""
+    esperado_sec = TITULO_MAPA_PRESENTE if num_sec == 2 else (TITULO_MAPA_FUTURO if num_sec == 5 else None)
+    cerca: tuple[str, int] | None = None
+    for linea in lineas:
+        ignorar, cerca = _avanzar_cerca_gfm(linea, cerca)
+        if ignorar:
+            continue
+        candidato = _texto_candidato_titulo_mapa(linea)
+        if candidato is None:
+            continue
+        clave = _es_mencion_titulo_mapa(candidato)
+        if clave is None:
+            continue
+        if esperado_sec is not None and linea.rstrip() == esperado_sec:
+            continue
+        objetivo = _titulo_esperado_para_seccion(num_sec, clave)
+        if num_sec in (2, 5):
+            informe.error(f"sección {num_sec}: el título del mapa va exactamente así: {objetivo}")
+        else:
+            informe.error(
+                f"sección {num_sec}: los mapas van solo en la sección 2 (presente) y en la 5 (futuro)"
+            )
+
+
+def _es_separador_tabla_gfm(linea: str) -> bool:
+    """True si la línea es un separador de tabla Markdown con o sin barras exteriores."""
+    s = linea.strip()
+    if "|" not in s:
+        return False
+    partes = s.strip("|").split("|")
+    return bool(partes) and all(re.match(r"^\s*:?-{1,}:?\s*$", parte) for parte in partes)
+
+
+def _es_inicio_tabla_c3(lineas: list[str], i: int) -> bool:
+    """True si `lineas[i]` inicia una tabla Markdown (con barras o sin barras con separador GFM)."""
+    linea = lineas[i]
+    s = linea.strip()
+    if s.startswith("|"):
+        return True
+    if "|" not in s or s.startswith(">") or TITULO_MD.match(linea):
+        return False
+    return (
+        i + 1 < len(lineas)
+        and _es_apertura_cerca_gfm(lineas[i + 1]) is None
+        and _es_separador_tabla_gfm(lineas[i + 1])
+    )
+
+
+def _consumir_bloque_tabla_c3(lineas: list[str], i: int) -> tuple[list[str], int]:
+    """Consume las líneas contiguas de una tabla Markdown desde `i` y devuelve `(bloque, siguiente_i)`."""
+    bloque: list[str] = []
+    if lineas[i].strip().startswith("|"):
+        while (
+            i < len(lineas)
+            and _es_apertura_cerca_gfm(lineas[i]) is None
+            and lineas[i].strip().startswith("|")
+        ):
+            bloque.append(lineas[i])
+            i += 1
+        return bloque, i
+    while (
+        i < len(lineas)
+        and _es_apertura_cerca_gfm(lineas[i]) is None
+        and lineas[i].strip()
+        and not TITULO_MD.match(lineas[i])
+        and "|" in lineas[i]
+    ):
+        bloque.append(lineas[i])
+        i += 1
+    return bloque, i
+
+
+def _validar_zona_sin_mapas_c3(
+    lineas: list[str], etiqueta: str, informe: Informe, *, ignorar_h1_a3: bool = False
+) -> None:
+    """En contrato 3, rechaza cualquier título de mapa o tabla con Paso y Fuente fuera de secciones 2 y 5."""
+    cerca: tuple[str, int] | None = None
+    i = 0
+    while i < len(lineas):
+        linea = lineas[i]
+        ignorar, cerca = _avanzar_cerca_gfm(linea, cerca)
+        if ignorar:
+            i += 1
+            continue
+        if ignorar_h1_a3 and re.match(r"^\s*#(?!#)\s*A3\s*:", linea, re.IGNORECASE):
+            i += 1
+            continue
+        candidato = _texto_candidato_titulo_mapa(linea)
+        if candidato is not None and _es_mencion_titulo_mapa(candidato) is not None:
+            informe.error(f"{etiqueta}: los mapas van solo en la sección 2 (presente) y en la 5 (futuro)")
+            return
+        if _es_inicio_tabla_c3(lineas, i):
+            bloque, i = _consumir_bloque_tabla_c3(lineas, i)
+            tabla = Tabla(celdas(bloque[0]), [])
+            if _indice_columna_paso(tabla) is not None and columna(tabla, "Fuente") is not None:
+                informe.error(f"{etiqueta}: los mapas van solo en la sección 2 (presente) y en la 5 (futuro)")
+                return
+            continue
+        i += 1
+
+
+def _validar_tabla_bajo_titulo_mapa_c3(
+    lineas: list[str], num_sec: int, informe: Informe, *, exigir_mapa: bool = True
+) -> None:
+    """En contrato 3, valida encabezado de mapas bajo título exacto, unicidad y rechazo fuera de título."""
+    titulo_esperado = TITULO_MAPA_PRESENTE if num_sec == 2 else (TITULO_MAPA_FUTURO if num_sec == 5 else None)
+    tipo = "presente" if num_sec == 2 else "futuro"
+    esperando_tabla = False
+    bajo_titulo_mapa = False
+    tabla_bajo_titulo_vista = False
+    titulos_mapa = 0
+    cerca: tuple[str, int] | None = None
+    i = 0
+    while i < len(lineas):
+        linea = lineas[i]
+        ignorar, cerca = _avanzar_cerca_gfm(linea, cerca)
+        if ignorar:
+            i += 1
+            continue
+        if titulo_esperado is not None and linea.rstrip() == titulo_esperado:
+            if esperando_tabla:
+                informe.error(
+                    f"sección {num_sec}: bajo '{titulo_esperado}' falta la tabla del mapa con el encabezado exacto {LINEA_TABLA_MAPA}"
+                )
+            titulos_mapa += 1
+            if titulos_mapa > 1:
+                informe.error(
+                    f"sección {num_sec}: solo puede haber un '{titulo_esperado}' en la sección"
+                )
+            esperando_tabla = True
+            bajo_titulo_mapa = True
+            tabla_bajo_titulo_vista = False
+            i += 1
+            continue
+        if TITULO_MD.match(linea):
+            if esperando_tabla:
+                informe.error(
+                    f"sección {num_sec}: bajo '{titulo_esperado}' falta la tabla del mapa con el encabezado exacto {LINEA_TABLA_MAPA}"
+                )
+                esperando_tabla = False
+            bajo_titulo_mapa = False
+            tabla_bajo_titulo_vista = False
+            i += 1
+            continue
+        if _es_inicio_tabla_c3(lineas, i):
+            bloque, i = _consumir_bloque_tabla_c3(lineas, i)
+            encabezado = celdas(bloque[0])
+            tabla = Tabla(encabezado, [])
+            if esperando_tabla:
+                if tuple(encabezado) != TABLA_MAPA_ENCABEZADO:
+                    informe.error(
+                        f"sección {num_sec}: la tabla bajo 'Mapa del estado {tipo}' debe tener exactamente el encabezado {LINEA_TABLA_MAPA}"
+                    )
+                esperando_tabla = False
+                tabla_bajo_titulo_vista = True
+            elif bajo_titulo_mapa and tabla_bajo_titulo_vista:
+                informe.error(
+                    f"sección {num_sec}: debajo del título del mapa va una sola tabla"
+                )
+            elif _indice_columna_paso(tabla) is not None and columna(tabla, "Fuente") is not None:
+                informe.error(
+                    f"sección {num_sec}: esta tabla parece un mapa: va bajo el título del mapa, con el encabezado de la plantilla ({LINEA_TABLA_MAPA})"
+                )
+            continue
+        i += 1
+    if esperando_tabla and titulo_esperado is not None:
+        informe.error(
+            f"sección {num_sec}: bajo '{titulo_esperado}' falta la tabla del mapa con el encabezado exacto {LINEA_TABLA_MAPA}"
+        )
+    if exigir_mapa and titulo_esperado is not None and titulos_mapa == 0:
+        informe.error(
+            f"sección {num_sec}: falta el mapa: {titulo_esperado}, con la tabla {LINEA_TABLA_MAPA}"
+        )
+
+
+def _sin_codigo_inline(linea: str) -> str:
+    en_cod = _mapa_codigo_en_linea(linea)
+    return "".join(" " if en_cod[k] else ch for k, ch in enumerate(linea))
+
+
+def _tiene_barra_fuera_de_codigo(linea: str) -> bool:
+    return bool(BARRA_SIN_ESCAPAR.search(_sin_codigo_inline(linea)))
+
+
+def _es_fila_candidata_c3(linea: str) -> tuple[bool, bool, str]:
+    """Indica si la línea parece fila de tabla en contrato 3 y si está dentro de una cita '>'."""
+    if re.match(r"^\s*>", linea):
+        tras = re.sub(r"^(?:\s*>\s*)+", "", linea)
+        s_tras = tras.strip()
+        if s_tras.startswith("|") or len(BARRA_SIN_ESCAPAR.findall(_sin_codigo_inline(s_tras))) >= 2:
+            return True, True, tras
+        return False, True, tras
+    s = linea.strip()
+    if s.startswith("|"):
+        return True, False, linea
+    if len(BARRA_SIN_ESCAPAR.findall(_sin_codigo_inline(s))) >= 2:
+        return True, False, linea
+    return False, False, linea
+
+
+def _tiene_barras_exteriores(linea: str) -> bool:
+    s = linea.strip()
+    return s.startswith("|") and s.endswith("|") and not s.endswith("\\|")
+
+
+def _inicio_fila_c3(linea: str) -> str:
+    primera = celdas(linea)[0]
+    return primera if primera else linea.strip()
+
+
+def _validar_filas_tabla_c3(lineas: list[str], num_sec: int, informe: Informe) -> None:
+    """En contrato 3, exige tablas bien formadas y filas con '|' al principio y al final."""
+    cerca: tuple[str, int] | None = None
+    i = 0
+    while i < len(lineas):
+        linea = lineas[i]
+        ignorar, cerca = _avanzar_cerca_gfm(linea, cerca)
+        if ignorar:
+            i += 1
+            continue
+        es_cand, en_cita, sin_cita = _es_fila_candidata_c3(linea)
+        es_apertura_gfm_sin_barras = (
+            not es_cand
+            and not en_cita
+            and bool(linea.strip())
+            and not TITULO_MD.match(linea)
+            and _tiene_barra_fuera_de_codigo(linea)
+            and i + 1 < len(lineas)
+            and _es_apertura_cerca_gfm(lineas[i + 1]) is None
+            and "|" in lineas[i + 1]
+            and es_separador(lineas[i + 1])
+        )
+        if not es_cand and not es_apertura_gfm_sin_barras:
+            i += 1
+            continue
+        if en_cita:
+            inicio = _inicio_fila_c3(sin_cita)
+            while i < len(lineas) and _es_apertura_cerca_gfm(lineas[i]) is None:
+                c_ok, c_cita, _ = _es_fila_candidata_c3(lineas[i])
+                if not (c_ok and c_cita):
+                    break
+                i += 1
+            informe.error(f"sección {num_sec}: la fila '{inicio}' quedó fuera de la tabla")
+            continue
+
+        bloque: list[str] = []
+        while i < len(lineas):
+            if _es_apertura_cerca_gfm(lineas[i]) is not None:
+                break
+            b_ok, b_cita, _ = _es_fila_candidata_c3(lineas[i])
+            if b_cita:
+                break
+            if b_ok:
+                bloque.append(lineas[i])
+                i += 1
+                continue
+            es_pegada_con_barra = (
+                bool(lineas[i].strip())
+                and not TITULO_MD.match(lineas[i])
+                and _tiene_barra_fuera_de_codigo(lineas[i])
+                and (bool(bloque) or es_apertura_gfm_sin_barras)
+            )
+            if es_pegada_con_barra:
+                bloque.append(lineas[i])
+                i += 1
+                continue
+            break
+
+        tabla_valida = len(bloque) >= 2 and "|" in bloque[1] and es_separador(bloque[1])
+        if tabla_valida:
+            for fila_linea in bloque:
+                if not _tiene_barras_exteriores(fila_linea):
+                    informe.error(
+                        f"sección {num_sec}: la fila '{_inicio_fila_c3(fila_linea)}' va con | al principio y al final"
+                    )
+        else:
+            for fila_linea in bloque:
+                inicio = _inicio_fila_c3(fila_linea)
+                if not _tiene_barras_exteriores(fila_linea):
+                    informe.error(
+                        f"sección {num_sec}: la fila '{inicio}' va con | al principio y al final"
+                    )
+                informe.error(f"sección {num_sec}: la fila '{inicio}' quedó fuera de la tabla")
+
+
+def tipo_mapa_estado(subtitulo: str | None, *, exacto: bool = False) -> str | None:
+    if not subtitulo:
+        return None
+    if exacto:
+        if subtitulo == "Mapa del estado presente":
+            return "presente"
+        if subtitulo == "Mapa del estado futuro":
+            return "futuro"
+        return None
+    limpio = subtitulo.replace("**", "").replace("__", "").replace("`", "").strip()
+    m = MAPA_ESTADO_H3.match(limpio)
+    return m.group(1).lower() if m else None
+
+
+def _indice_columna_paso(tabla: Tabla) -> int | None:
+    for i, titulo in enumerate(tabla.encabezado):
+        if normalizar(titulo) in ("paso", "pasos"):
+            return i
+    return None
+
+
+def _bloques_tabla_con_subtitulo(
+    lineas: list[str], *, contrato_3: bool = False
+) -> list[tuple[int, int, str | None, Tabla]]:
+    resultado: list[tuple[int, int, str | None, Tabla]] = []
+    subtitulo: str | None = None
+    cerca: tuple[str, int] | None = None
+    i = 0
+    while i < len(lineas):
+        ignorar, cerca = _avanzar_cerca_gfm(lineas[i], cerca)
+        if ignorar:
+            i += 1
+            continue
+        s = lineas[i].strip()
+        m_sub = SUBTITULO_H3.match(lineas[i])
+        if m_sub:
+            subtitulo = m_sub.group(1) if not contrato_3 or lineas[i].rstrip() in (TITULO_MAPA_PRESENTE, TITULO_MAPA_FUTURO) else None
+            i += 1
+            continue
+        if TITULO_MD.match(lineas[i]):
+            subtitulo = None
+            i += 1
+            continue
+        if s.startswith("|"):
+            inicio = i
+            bloque: list[str] = []
+            while (
+                i < len(lineas)
+                and _es_apertura_cerca_gfm(lineas[i]) is None
+                and lineas[i].strip().startswith("|")
+            ):
+                bloque.append(lineas[i])
+                i += 1
+            filas = [celdas(f) for f in bloque[1:] if not es_separador(f)]
+            tabla = Tabla(celdas(bloque[0]), [f for f in filas if any(f)])
+            sub_tabla = subtitulo
+            if not contrato_3 and tipo_mapa_estado(sub_tabla, exacto=False) is not None and normalizar(celda(tabla.encabezado, 0)) != "paso":
+                sub_tabla = None
+            subtitulo = None
+            resultado.append((inicio, i, sub_tabla, tabla))
+        else:
+            i += 1
+    return resultado
+
+
+def _tipo_mapa_para_bloque(
+    sub: str | None, tabla: Tabla, num_sec: int | None, *, contrato_3: bool
+) -> str | None:
+    del tabla
+    if not contrato_3:
+        return tipo_mapa_estado(sub, exacto=False)
+    tipo = tipo_mapa_estado(sub, exacto=True)
+    if tipo == "presente" and num_sec == 2:
+        return "presente"
+    if tipo == "futuro" and num_sec == 5:
+        return "futuro"
+    return None
+
+
+def tablas_con_subtitulo(lineas: list[str], *, contrato_3: bool = False) -> list[tuple[str | None, Tabla]]:
+    return [(sub, tabla) for _, _, sub, tabla in _bloques_tabla_con_subtitulo(lineas, contrato_3=contrato_3)]
+
+
+def lineas_fuera_de_mapas(
+    lineas: list[str], *, contrato_3: bool = False, num_sec: int | None = None
+) -> list[str]:
+    indices_mapa: set[int] = set()
+    for inicio, fin, sub, tabla in _bloques_tabla_con_subtitulo(lineas, contrato_3=contrato_3):
+        if _tipo_mapa_para_bloque(sub, tabla, num_sec, contrato_3=contrato_3) is not None:
+            indices_mapa.update(range(inicio, fin))
+    return [linea for idx, linea in enumerate(lineas) if idx not in indices_mapa]
 
 
 def columna(tabla: Tabla, nombre: str) -> int | None:
@@ -640,12 +1602,12 @@ def leer_documento(texto: str) -> tuple[Documento, list[str]]:
     lineas = texto.split("\n")
     avisos: list[str] = []
     encabezados: list[tuple[int, str]] = []
-    en_codigo = False
+    cerca: tuple[str, int] | None = None
     for i, linea in enumerate(lineas):
-        if linea.strip().startswith("```"):
-            en_codigo = not en_codigo
+        ignorar, cerca = _avanzar_cerca_gfm(linea, cerca)
+        if ignorar:
             continue
-        if not en_codigo and re.match(r"##(?!#)(\s|$)", linea):
+        if re.match(r"##(?!#)(\s|$)", linea):
             encabezados.append((i, linea[2:].strip()))
     fin_cabecera = encabezados[0][0] if encabezados else len(lineas)
     secciones: dict[int, Seccion] = {}
@@ -685,12 +1647,154 @@ def numero_de_seccion(titulo: str, avisos: list[str]) -> int | None:
     return None
 
 
+def _distancia_edicion(a: str, b: str) -> int:
+    """Distancia de Levenshtein entre dos cadenas."""
+    if abs(len(a) - len(b)) > 2:
+        return abs(len(a) - len(b))
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, start=1):
+        curr = [i]
+        for j, cb in enumerate(b, start=1):
+            costo = 0 if ca == cb else 1
+            curr.append(min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + costo))
+        prev = curr
+    return prev[-1]
+
+
+def _etiqueta_cabecera_es_contrato(linea: str) -> bool:
+    """True si la etiqueta antes del primer ':' nombra Contrato o está a <= 2 cambios."""
+    if ":" not in linea:
+        return False
+    antes = linea.split(":", 1)[0]
+    sin_coment = re.sub(r"<!--|-->", " ", antes)
+    sin_cita = re.sub(r"^[\s\xa0>]+", "", sin_coment)
+    sin_vineta = re.sub(r"^(?:[-+•]\s*|\*\s+)", "", sin_cita)
+    sin_enfasis = re.sub(r"[*_~`]+", "", sin_vineta)
+    descompuesto = unicodedata.normalize("NFKD", sin_enfasis)
+    limpio = "".join(c for c in descompuesto if not unicodedata.combining(c)).lower()
+    etiqueta = re.sub(r"\s+", " ", limpio).strip()
+    if not etiqueta:
+        return False
+    return "contrato" in etiqueta or _distancia_edicion(etiqueta, "contrato") <= 2
+
+
+def _analizar_contrato_cabecera(cabecera: list[str]) -> tuple[str | None, list[str], int]:
+    """Analiza las líneas Contrato en la cabecera; devuelve (valor, errores, total_lineas)."""
+    valor: str | None = None
+    hay_mal_escrita = False
+    total_lineas = 0
+    cerca_cab: tuple[str, int] | None = None
+    en_comentario_html = False
+
+    for linea in cabecera:
+        s = linea.strip()
+        es_delim_cerca = False
+        if cerca_cab is None:
+            apertura = _es_apertura_cerca_gfm(linea)
+            if apertura is not None:
+                cerca_cab = apertura
+                es_delim_cerca = True
+        elif _es_cierre_cerca_gfm(linea, cerca_cab):
+            cerca_cab = None
+            es_delim_cerca = True
+
+        linea_comentada = en_comentario_html or "<!--" in linea or "-->" in linea
+        if en_comentario_html:
+            if "-->" in linea:
+                tras_cierre = linea.split("-->", 1)[1]
+                en_comentario_html = "<!--" in re.sub(r"<!--.*?-->", "", tras_cierre)
+        else:
+            sin_cerrados = re.sub(r"<!--.*?-->", "", linea)
+            if "<!--" in sin_cerrados:
+                en_comentario_html = True
+
+        es_nivel_superior = cerca_cab is None and not es_delim_cerca and not linea_comentada
+        if es_nivel_superior:
+            m_exacta = ETIQUETA_CONTRATO_EXACTA.match(linea)
+            if m_exacta is not None:
+                total_lineas += 1
+                if valor is None:
+                    valor = (m_exacta.group(1) or "").strip()
+                continue
+
+        if not es_delim_cerca and _etiqueta_cabecera_es_contrato(linea):
+            total_lineas += 1
+            hay_mal_escrita = True
+        elif es_delim_cerca and ":" in s and _etiqueta_cabecera_es_contrato(linea):
+            total_lineas += 1
+            hay_mal_escrita = True
+
+    errores: list[str] = []
+    if hay_mal_escrita:
+        errores.append("Cabecera: la línea Contrato va así: - **Contrato:** 3")
+    if total_lineas >= 2:
+        errores.append("Cabecera: hay más de una línea Contrato; deja una sola")
+    return (valor, errores, total_lineas)
+
+
+def _leer_contrato_cabecera(cabecera: list[str]) -> tuple[str | None, str | None]:
+    """Lee la línea Contrato de la cabecera; devuelve (valor, primer_error_de_formato)."""
+    valor, errores, _ = _analizar_contrato_cabecera(cabecera)
+    return (valor, errores[0] if errores else None)
+
+
+def _tiene_rasgos_contrato_3(doc: Documento) -> bool:
+    """True si el A3 tiene rasgos del contrato 3 (encabezado Paso+Fuente o '(base:' en Predicción)."""
+    lineas = doc.lineas
+    cerca: tuple[str, int] | None = None
+    i = 0
+    while i < len(lineas):
+        ignorar, cerca = _avanzar_cerca_gfm(lineas[i], cerca)
+        if ignorar:
+            i += 1
+            continue
+        s = lineas[i].strip()
+        es_inicio_tabla = s.startswith("|") or (
+            "|" in s
+            and i + 1 < len(lineas)
+            and "|" in lineas[i + 1]
+            and es_separador(lineas[i + 1])
+        )
+        if es_inicio_tabla:
+            bloque: list[str] = []
+            while i < len(lineas):
+                fila_s = lineas[i].strip()
+                if not fila_s or _es_apertura_cerca_gfm(lineas[i]) is not None:
+                    break
+                if fila_s.startswith("|") or "|" in fila_s:
+                    bloque.append(lineas[i])
+                    i += 1
+                else:
+                    break
+            encabezado = [normalizar(c) for c in celdas(bloque[0])]
+            if "paso" in encabezado and "fuente" in encabezado:
+                return True
+            indices_pred = [idx for idx, col in enumerate(encabezado) if col == "prediccion"]
+            if indices_pred:
+                for fila_raw in bloque[1:]:
+                    if es_separador(fila_raw):
+                        continue
+                    fila_celdas = celdas(fila_raw)
+                    for idx in indices_pred:
+                        if idx < len(fila_celdas) and "(base:" in fila_celdas[idx].lower():
+                            return True
+            continue
+        i += 1
+    return False
+
+
 def leer_campos(lineas: list[str]) -> dict[str, tuple[str, str]]:
     campos: dict[str, tuple[str, str]] = {}
+    cerca: tuple[str, int] | None = None
     for linea in lineas:
+        ignorar, cerca = _avanzar_cerca_gfm(linea, cerca)
+        if ignorar:
+            continue
         m = CAMPO.match(linea)
         if m:
             clave = normalizar(m.group(1))
+            if clave == "contrato" and ETIQUETA_CONTRATO_EXACTA.match(linea) is None:
+                continue
             if clave and clave not in campos:
                 campos[clave] = (m.group(1).strip(), m.group(2).strip())
     return campos
@@ -700,12 +1804,12 @@ def tiene_estructura_a3(doc: Documento) -> bool:
     """True si el documento trae un título '# A3:' o al menos una sección del A3."""
     if doc.secciones:
         return True
-    en_codigo = False
+    cerca: tuple[str, int] | None = None
     for linea in doc.cabecera:
-        if linea.strip().startswith("```"):
-            en_codigo = not en_codigo
+        ignorar, cerca = _avanzar_cerca_gfm(linea, cerca)
+        if ignorar:
             continue
-        if not en_codigo and re.match(r"^\s*#(?!#)\s*A3\s*:", linea, re.IGNORECASE):
+        if re.match(r"^\s*#(?!#)\s*A3\s*:", linea, re.IGNORECASE):
             return True
     return False
 
@@ -739,42 +1843,78 @@ def validar_a3(
     if not texto.strip() or (
         not tiene_estructura_a3(doc) and "etapa" not in campos and "propietario" not in campos and not marcas_nuevas
     ):
-        informe = Informe(etapa=None, origen_etapa="sin estructura", formato="sin_estructura")
+        informe = Informe(
+            etapa=None,
+            origen_etapa="sin estructura",
+            formato="sin_estructura",
+            contrato=None,
+            origen_contrato="archivo vacío o sin estructura de A3",
+        )
         informe.error("el archivo está vacío o no tiene estructura de A3")
         return informe
+    val_contrato_cab, errores_formato_contrato, total_lineas_contrato = _analizar_contrato_cabecera(doc.cabecera)
     sin_cabecera_nueva = etapa is None and "etapa" not in campos and "propietario" not in campos
     marcas = marcas_nuevas if sin_cabecera_nueva else []
     if sin_cabecera_nueva and not marcas:
         return validar_formato_anterior(texto, doc, contrato_base)
 
-    campo_contrato = campos.get("contrato")
     contrato: dict | None = None
-    error_contrato: str | None = None
-    if campo_contrato is None:
-        contrato = contrato_base
+    errores_contrato: list[str] = []
+    num_contrato = "1"
+    contrato_num_inf: int | None = None
+    origen_contrato = ""
+    if errores_formato_contrato:
+        errores_contrato.extend(errores_formato_contrato)
+        origen_contrato = "línea Contrato inválida en la cabecera"
+    elif val_contrato_cab is None and total_lineas_contrato == 0:
+        if _tiene_rasgos_contrato_3(doc):
+            errores_contrato.append("Cabecera: falta - **Contrato:** 3")
+            origen_contrato = "sin línea Contrato en la cabecera"
+        else:
+            contrato = contrato_base
+            contrato_num_inf = 1
+            origen_contrato = "por omisión, sin línea Contrato en la cabecera"
     else:
-        val_contrato = campo_contrato[1].strip()
+        val_contrato = val_contrato_cab or ""
+        num_contrato = val_contrato
         if re.fullmatch(r"[0-9]+", val_contrato) and str(int(val_contrato)) == val_contrato:
             try:
-                contrato = cargar_contrato(int(val_contrato))
+                contrato_num_inf = int(val_contrato)
+                contrato = cargar_contrato(contrato_num_inf)
+                origen_contrato = "leído de la cabecera"
             except KeyError:
-                error_contrato = f"Cabecera: el Contrato '{val_contrato}' no existe; los válidos son 1 y 2"
+                contrato_num_inf = None
+                validos_txt = _texto_versiones_validas()
+                errores_contrato.append(
+                    f"Cabecera: el Contrato '{val_contrato}' no existe; los válidos son {validos_txt}"
+                )
+                origen_contrato = "línea Contrato inválida en la cabecera"
         else:
-            error_contrato = f"Cabecera: el Contrato '{val_contrato}' no existe; los válidos son 1 y 2"
+            validos_txt = _texto_versiones_validas()
+            errores_contrato.append(
+                f"Cabecera: el Contrato '{val_contrato}' no existe; los válidos son {validos_txt}"
+            )
+            origen_contrato = "línea Contrato inválida en la cabecera"
 
     if contrato is not None and etapa is not None and etapa not in contrato["etapas"]:
         raise ValueError(f"etapa desconocida: {etapa!r}")
     if contrato is not None and contrato["reglas"]["fuentes"] == "cuatro_formas" and ruta_a3_path is None:
-        raise ValueError("contrato 2 requiere ruta_a3")
+        raise ValueError(f"contrato {num_contrato} requiere ruta_a3")
 
-    informe = Informe(etapa=None, origen_etapa="pedida con --etapa" if etapa else "leída de la cabecera")
+    informe = Informe(
+        etapa=None,
+        origen_etapa="pedida con --etapa" if etapa else "leída de la cabecera",
+        contrato=contrato_num_inf,
+        origen_contrato=origen_contrato,
+    )
     if marcas:
         informe.aviso(
             f"se valida como formato nuevo (v1.2.0) porque trae {', '.join(marcas)}; la cabecera necesita"
             " las líneas Propietario y Etapa"
         )
-    if error_contrato is not None:
-        informe.error(error_contrato)
+    if errores_contrato:
+        for err_c in errores_contrato:
+            informe.error(err_c)
         for aviso in avisos_titulos:
             informe.aviso(aviso)
         validar_cabecera(doc, campos, informe)
@@ -803,6 +1943,7 @@ def validar_a3(
     if efectiva is None:
         return informe
 
+    es_contrato_3 = contrato["reglas"].get("fuente_mapa") == "cuatro_formas"
     ultima = contrato["ultima_seccion"][efectiva]
     completas: dict[int, Seccion] = {}
     for numero in range(1, ultima + 1):
@@ -815,22 +1956,61 @@ def validar_a3(
             completas[numero] = seccion
             for marcador in marcadores(seccion.cuerpo):
                 informe.error(f"sección {numero}: Contiene placeholder sin completar: '{marcador}'")
-            for tabla in tablas(seccion.cuerpo):
+            for tabla in tablas(seccion.cuerpo, contrato_3=es_contrato_3):
                 avisar_celdas_desparejas(tabla, f"sección {numero}", informe)
+            if es_contrato_3:
+                if numero in (2, 5):
+                    _validar_titulos_mapa_c3(seccion.cuerpo, numero, informe)
+                    _validar_tabla_bajo_titulo_mapa_c3(seccion.cuerpo, numero, informe)
+                else:
+                    _validar_zona_sin_mapas_c3(seccion.cuerpo, f"sección {numero}", informe)
+                _validar_filas_tabla_c3(seccion.cuerpo, numero, informe)
+    if es_contrato_3:
+        _validar_zona_sin_mapas_c3(doc.cabecera, "Cabecera", informe, ignorar_h1_a3=True)
+        for num_contexto, extra in _extras_en_etapa(doc, ultima):
+            clave_extra = _es_mencion_titulo_mapa(extra.titulo)
+            objetivo_extra = _titulo_esperado_para_seccion(num_contexto, clave_extra) if clave_extra else None
+            es_mapa_misma_sec = (
+                (num_contexto == 2 and objetivo_extra == TITULO_MAPA_PRESENTE)
+                or (num_contexto == 5 and objetivo_extra == TITULO_MAPA_FUTURO)
+            )
+            if es_mapa_misma_sec:
+                _validar_titulos_mapa_c3([f"## {extra.titulo}", *extra.cuerpo], num_contexto, informe)
+            else:
+                _validar_zona_sin_mapas_c3([f"## {extra.titulo}", *extra.cuerpo], f"sección '{extra.titulo}'", informe)
+            _validar_filas_tabla_c3(extra.cuerpo, num_contexto, informe)
+        for extra in doc.extras:
+            if normalizar(extra.titulo) == "siguientes pasos":
+                _validar_zona_sin_mapas_c3([f"## {extra.titulo}", *extra.cuerpo], f"sección '{extra.titulo}'", informe)
     futuras = [n for n, s in sorted(doc.secciones.items()) if n > ultima and s.tiene_contenido()]
     if futuras:
         informe.aviso(
             f"las secciones {', '.join(map(str, futuras))} tienen contenido y no se validan en la etapa {efectiva}"
         )
 
+    if 1 in completas:
+        validar_mapas_seccion(completas[1], efectiva, informe, contrato, bases_fuentes, ruta_a3_path)
     if 2 in completas:
-        validar_seccion_2(completas[2], doc, informe, contrato, bases_fuentes)
-    causas = validar_seccion_4(completas[4], informe, contrato, bases_fuentes) if 4 in completas else []
+        validar_seccion_2(completas[2], doc, informe, contrato, bases_fuentes, ruta_a3_path)
+        validar_mapas_seccion(completas[2], efectiva, informe, contrato, bases_fuentes, ruta_a3_path)
+    if 3 in completas:
+        validar_mapas_seccion(completas[3], efectiva, informe, contrato, bases_fuentes, ruta_a3_path)
+    causas = (
+        validar_seccion_4(completas[4], informe, contrato, bases_fuentes, ruta_a3_path)
+        if 4 in completas
+        else []
+    )
+    if 4 in completas:
+        validar_mapas_seccion(completas[4], efectiva, informe, contrato, bases_fuentes, ruta_a3_path)
     if 5 in completas:
         validar_seccion_5(completas[5], causas, informe, contrato)
+        validar_mapas_seccion(completas[5], efectiva, informe, contrato, bases_fuentes, ruta_a3_path)
     irreversible = validar_seccion_6(completas[6], informe) if 6 in completas else False
+    if 6 in completas:
+        validar_mapas_seccion(completas[6], efectiva, informe, contrato, bases_fuentes, ruta_a3_path)
     if 7 in completas:
         validar_seccion_7(completas[7], informe, contrato)
+        validar_mapas_seccion(completas[7], efectiva, informe, contrato, bases_fuentes, ruta_a3_path)
     validar_coach(campos, efectiva, irreversible, informe)
     # El bloque Siguientes pasos depende de la etapa del documento (su cabecera), no de la pedida.
     validar_siguientes_pasos(doc, etapa_cabecera or efectiva, informe)
@@ -901,9 +2081,12 @@ def validar_seccion_2(
     informe: Informe,
     contrato: dict | None = None,
     bases_fuentes: Sequence[Path] = (),
+    ruta_a3: Path | None = None,
 ) -> None:
     contrato_act = contrato or cargar_contrato(1)
     cuatro_formas = contrato_act["reglas"]["fuentes"] == "cuatro_formas"
+    es_contrato_3 = contrato_act["reglas"].get("fuente_mapa") == "cuatro_formas"
+    ruta_a3_c3 = ruta_a3 if es_contrato_3 else None
     cuerpo = seccion.cuerpo
     brechas = [linea for linea in cuerpo if BRECHA.match(linea)]
     parecidas = [linea for linea in cuerpo if re.match(r"\s*[-*]\s*\*\*Brecha\b[^*]*:\*\*", linea)]
@@ -918,9 +2101,26 @@ def validar_seccion_2(
         if fuera:
             linea_brecha = fuera[0]
             informe.aviso("la línea '- **Brecha:**' está fuera de la sección 2; va en la sección 2")
-    otras = [linea for linea in cuerpo if linea not in brechas and linea not in parecidas]
+    otras = [
+        linea
+        for linea in lineas_fuera_de_mapas(cuerpo, contrato_3=es_contrato_3, num_sec=2)
+        if linea not in brechas and linea not in parecidas
+    ]
 
-    tabla_hechos = next((t for t in tablas(cuerpo) if columna(t, "Fuente") is not None), None)
+    tablas_no_mapa = [
+        t
+        for sub, t in tablas_con_subtitulo(cuerpo, contrato_3=es_contrato_3)
+        if _tipo_mapa_para_bloque(sub, t, 2, contrato_3=es_contrato_3) is None
+    ]
+    tabla_hechos = next(
+        (
+            t
+            for t in tablas_no_mapa
+            if columna(t, "Fuente") is not None
+            and not (es_contrato_3 and _indice_columna_paso(t) is not None)
+        ),
+        None,
+    )
     coincidencias_fuente = [(linea, m) for linea in otras if (m := FUENTE_EN_LINEA.search(linea))]
     if tabla_hechos is not None:
         i_fuente = columna(tabla_hechos, "Fuente")
@@ -930,7 +2130,15 @@ def validar_seccion_2(
             hecho = celda(fila, 0) or "(sin texto)"
             valor_fuente = celda(fila, i_fuente)
             if cuatro_formas:
-                if not fuente_cuatro_formas_valida(valor_fuente, bases_fuentes):
+                estado_f = _estado_fuente_cuatro_formas(
+                    valor_fuente,
+                    bases_fuentes,
+                    exigir_servidor=es_contrato_3,
+                    ruta_a3=ruta_a3_c3,
+                )
+                if estado_f == "autocita":
+                    informe.error(mensaje_fuente_autocita(2, valor_fuente, hecho))
+                elif estado_f != "valida":
                     informe.error(mensaje_fuente_invalida(2, valor_fuente, hecho))
             elif not fuente_real(valor_fuente):
                 informe.error(f"sección 2: el hecho '{hecho}' está sin fuente (ruta, comando, registro o medición)")
@@ -940,8 +2148,16 @@ def validar_seccion_2(
             for linea, m in coincidencias_fuente:
                 valor_fuente = m.group(1)
                 hecho = _hecho_de_vineta_fuente(linea, m.start())
-                if fuente_cuatro_formas_valida(valor_fuente, bases_fuentes):
+                estado_f = _estado_fuente_cuatro_formas(
+                    valor_fuente,
+                    bases_fuentes,
+                    exigir_servidor=es_contrato_3,
+                    ruta_a3=ruta_a3_c3,
+                )
+                if estado_f == "valida":
                     al_menos_una_valida = True
+                elif estado_f == "autocita":
+                    informe.error(mensaje_fuente_autocita(2, valor_fuente, hecho))
                 else:
                     informe.error(mensaje_fuente_invalida(2, valor_fuente, hecho))
             if al_menos_una_valida:
@@ -968,15 +2184,119 @@ def validar_seccion_2(
         informe.aviso("sección 2: la Brecha no tiene ninguna cifra; sin número no se sabe si se cerró")
 
 
+def validar_mapas_seccion(
+    seccion: Seccion,
+    efectiva: str,
+    informe: Informe,
+    contrato: dict | None = None,
+    bases_fuentes: Sequence[Path] = (),
+    ruta_a3: Path | None = None,
+) -> None:
+    contrato_act = contrato or cargar_contrato(1)
+    if contrato_act["reglas"].get("fuente_mapa") != "cuatro_formas":
+        return
+    num_sec = seccion.numero or 2
+    etapas = contrato_act["etapas"]
+    tope_sm = contrato_act["reglas"].get("sin_medir_hasta")
+    sm_permitido = (
+        isinstance(tope_sm, str)
+        and tope_sm in etapas
+        and efectiva in etapas
+        and etapas.index(efectiva) <= etapas.index(tope_sm)
+    )
+    bloques = _bloques_tabla_con_subtitulo(seccion.cuerpo, contrato_3=True)
+    for _, _, sub, tabla in bloques:
+        tipo = _tipo_mapa_para_bloque(sub, tabla, num_sec, contrato_3=True)
+        if tipo is None:
+            continue
+        if tuple(tabla.encabezado) != TABLA_MAPA_ENCABEZADO:
+            continue
+        i_fuente = columna(tabla, "Fuente")
+        if i_fuente is None:
+            informe.error(f"sección {num_sec}: al Mapa del estado {tipo} le falta la columna 'Fuente'")
+            continue
+        if not tabla.filas:
+            informe.error(f"sección {num_sec}: el Mapa del estado {tipo} no tiene filas; ningún paso tiene fuente")
+            continue
+        i_paso = _indice_columna_paso(tabla)
+        i_paso = 0 if i_paso is None else i_paso
+        for fila in tabla.filas:
+            paso = celda(fila, i_paso) or "(sin texto)"
+            valor_fuente = celda(fila, i_fuente)
+            if tipo == "presente":
+                limpio_sm = _quitar_comillas_exteriores(valor_fuente)
+                if MARCA_SIN_MEDIR.fullmatch(limpio_sm):
+                    if sm_permitido:
+                        if limpio_sm != "[SIN MEDIR]":
+                            informe.aviso(
+                                f"sección {num_sec}: en el Mapa del estado presente, paso '{paso}':"
+                                " la marca se escribe '[SIN MEDIR]'"
+                            )
+                    else:
+                        informe.error(
+                            f"sección {num_sec}: en el Mapa del estado presente, el paso '{paso}' lleva"
+                            f" '[SIN MEDIR]' en la etapa {efectiva}; '[SIN MEDIR]' solo vale hasta {tope_sm}"
+                        )
+                else:
+                    estado_f = _estado_fuente_cuatro_formas(
+                        valor_fuente,
+                        bases_fuentes,
+                        exigir_servidor=True,
+                        ruta_a3=ruta_a3,
+                    )
+                    if estado_f == "autocita":
+                        informe.error(
+                            f"sección {num_sec}: en el Mapa del estado presente, paso '{paso}':"
+                            f" la fuente apunta al mismo A3 ('{valor_fuente}')"
+                        )
+                    elif estado_f != "valida":
+                        informe.error(
+                            f"sección {num_sec}: en el Mapa del estado presente, la fuente '{valor_fuente}'"
+                            f" del paso '{paso}' no tiene una forma válida o no existe. "
+                            "Formas válidas: ruta:línea; `comando` -> ruta; https://...; evidencia: ruta."
+                        )
+            else:
+                estado_base, interior_base = _analizar_base_celda_mapa_futuro(valor_fuente)
+                if estado_base == "base_canonica":
+                    if not _base_estimacion_valida(interior_base):
+                        informe.error(
+                            f"sección {num_sec}: en el Mapa del estado futuro, paso '{paso}':"
+                            f" su base '{interior_base.strip()}' no dice de dónde sale la estimación"
+                            " (escribe '(base: de dónde sale)')"
+                        )
+                else:
+                    estado_f = _estado_fuente_cuatro_formas(
+                        valor_fuente,
+                        bases_fuentes,
+                        exigir_servidor=True,
+                        ruta_a3=ruta_a3,
+                    )
+                    if estado_f == "autocita":
+                        informe.error(
+                            f"sección {num_sec}: en el Mapa del estado futuro, paso '{paso}':"
+                            f" la fuente apunta al mismo A3 ('{valor_fuente}')"
+                        )
+                    elif estado_f != "valida":
+                        informe.error(
+                            f"sección {num_sec}: en el Mapa del estado futuro, la fuente '{valor_fuente}'"
+                            f" del paso '{paso}' no tiene una forma válida o no existe y no es"
+                            " '(base: de dónde sale)'. Formas válidas: ruta:línea; `comando` -> ruta;"
+                            " https://...; evidencia: ruta; o (base: de dónde sale)."
+                        )
+
+
 def validar_seccion_4(
     seccion: Seccion,
     informe: Informe,
     contrato: dict | None = None,
     bases_fuentes: Sequence[Path] = (),
+    ruta_a3: Path | None = None,
 ) -> list[Causa]:
     contrato_act = contrato or cargar_contrato(1)
+    es_contrato_3 = contrato_act["reglas"].get("fuente_mapa") == "cuatro_formas"
+    ruta_a3_c3 = ruta_a3 if es_contrato_3 else None
     cuerpo = seccion.cuerpo
-    tablas_s4 = tablas(cuerpo)
+    tablas_s4 = tablas(cuerpo, contrato_3=es_contrato_3)
     filas_vs = [normalizar(celda(f, 0)) for t in tablas_s4 for f in t.filas]
     for rotulo in ("Verificado", "Supuesto"):
         if normalizar(rotulo) not in filas_vs:
@@ -989,7 +2309,15 @@ def validar_seccion_4(
                 if normalizar(celda(fila, 0).strip("*_ ")) == "verificado":
                     hecho = celda(fila, 1) or "(sin texto)"
                     valor_fuente = celda(fila, 2)
-                    if not fuente_cuatro_formas_valida(valor_fuente, bases_fuentes):
+                    estado_f = _estado_fuente_cuatro_formas(
+                        valor_fuente,
+                        bases_fuentes,
+                        exigir_servidor=es_contrato_3,
+                        ruta_a3=ruta_a3_c3,
+                    )
+                    if estado_f == "autocita":
+                        informe.error(mensaje_fuente_autocita(4, valor_fuente, hecho))
+                    elif estado_f != "valida":
                         informe.error(mensaje_fuente_invalida(4, valor_fuente, hecho))
 
     causas = leer_causas(cuerpo, informe, contrato_act)
@@ -998,7 +2326,7 @@ def validar_seccion_4(
     elif not any(re.match(r"\s*###\s*4b\.\s*Porqu[eé]s por causa", linea) for linea in cuerpo):
         informe.aviso("sección 4: falta el subtítulo '### 4b. Porqués por causa' sobre las causas")
 
-    ishikawa = next((t for t in tablas(cuerpo) if normalizar(celda(t.encabezado, 0)) == "rama"), None)
+    ishikawa = next((t for t in tablas_s4 if normalizar(celda(t.encabezado, 0)) == "rama"), None)
     no_aplica = any(normalizar(linea).lstrip("* ").startswith("ishikawa: no aplica") for linea in cuerpo)
     if ishikawa is None:
         if not no_aplica:
@@ -1155,45 +2483,58 @@ def validar_seccion_5(
     seccion: Seccion, causas: list[Causa], informe: Informe, contrato: dict | None = None
 ) -> None:
     contrato_act = contrato or cargar_contrato(1)
+    es_contrato_3 = contrato_act["reglas"].get("fuente_mapa") == "cuatro_formas"
     columnas_opciones = tuple(contrato_act["columnas_opciones"])
     cuerpo = seccion.cuerpo
-    tabla = next((t for t in tablas(cuerpo) if normalizar(celda(t.encabezado, 0)) == "opcion"), None)
+    todas_tablas = tablas(cuerpo, contrato_3=es_contrato_3)
+    if es_contrato_3:
+        tablas_opc = [t for t in todas_tablas if normalizar(celda(t.encabezado, 0)) == "opcion"]
+    else:
+        tablas_opc = [t for t in todas_tablas if normalizar(celda(t.encabezado, 0)) == "opcion"][:1]
     unica = leer_unica_opcion(cuerpo)
     if unica is not None and (not unica or marcadores([unica]) or not tiene_texto_real(unica)):
         informe.error("sección 5: la línea 'Única opción:' no dice el motivo por el que no hay otra")
-    if tabla is None:
+    if not tablas_opc:
         if unica is None:
             informe.error("sección 5: falta la tabla de opciones (mínimo dos) o la línea 'Única opción: <motivo>'")
         return
-    if len(tabla.filas) < 2 and unica is None:
+    total_filas = sum(len(t.filas) for t in tablas_opc)
+    if total_filas < 2 and unica is None:
         informe.error(
-            f"sección 5: la tabla tiene {len(tabla.filas)} opción; hacen falta dos opciones reales"
+            f"sección 5: la tabla tiene {total_filas} opción; hacen falta dos opciones reales"
             " o la línea 'Única opción: <motivo>'"
-        )
-
-    indices: dict[str, int | None] = {}
-    for nombre in columnas_opciones:
-        indices[nombre] = columna(tabla, nombre)
-        if indices[nombre] is None:
-            informe.error(f"sección 5: a la tabla de opciones le falta la columna '{nombre}'")
-    presentes = [i for i in indices.values() if i is not None]
-    if presentes != sorted(presentes):
-        informe.aviso(
-            f"sección 5: las columnas de la tabla de opciones van en otro orden: {' | '.join(columnas_opciones)}"
         )
 
     letras = {c.letra for c in causas if c.letra}
     por_causa: dict[str, list[str]] = {}
     niveles: list[str] = []
-    for fila in tabla.filas:
-        opcion = leer_fila_opcion(fila, indices, letras, informe, contrato_act)
-        comprobar_opcion(opcion, informe, contrato_act)
-        if opcion.causa:
-            por_causa.setdefault(opcion.causa, [])
-            if opcion.decision:
-                por_causa[opcion.causa].append(opcion.decision)
-        if opcion.nivel:
-            niveles.append(opcion.nivel)
+    encabezado_opc_exacto = "| " + " | ".join(columnas_opciones) + " |"
+    for tabla in tablas_opc:
+        if es_contrato_3 and tuple(tabla.encabezado) != columnas_opciones:
+            informe.error(
+                f"sección 5: toda tabla de opciones debe tener exactamente el encabezado {encabezado_opc_exacto}"
+            )
+            continue
+        indices: dict[str, int | None] = {}
+        for nombre in columnas_opciones:
+            indices[nombre] = columna(tabla, nombre)
+            if indices[nombre] is None:
+                informe.error(f"sección 5: a la tabla de opciones le falta la columna '{nombre}'")
+        presentes = [i for i in indices.values() if i is not None]
+        if presentes != sorted(presentes):
+            informe.aviso(
+                f"sección 5: las columnas de la tabla de opciones van en otro orden: {' | '.join(columnas_opciones)}"
+            )
+
+        for fila in tabla.filas:
+            opcion = leer_fila_opcion(fila, indices, letras, informe, contrato_act)
+            comprobar_opcion(opcion, informe, contrato_act)
+            if opcion.causa:
+                por_causa.setdefault(opcion.causa, [])
+                if opcion.decision:
+                    por_causa[opcion.causa].append(opcion.decision)
+            if opcion.nivel:
+                niveles.append(opcion.nivel)
 
     for causa in causas:
         if not causa.letra:
@@ -1220,7 +2561,7 @@ def leer_fila_opcion(
     cuadrantes = tuple(contrato_act["cuadrantes"])
     decisiones = tuple(contrato_act["decisiones"])
     texto_opcion = celda(fila, indices["Opción"])
-    m_id = re.match(r"O-\d+", texto_opcion)
+    m_id = re.match(r"O-\d+[a-z]?(?![A-Za-z0-9])", texto_opcion)
     nombre = m_id.group(0) if m_id else f"'{texto_opcion}'"
     if not m_id:
         informe.aviso(f"sección 5: la opción '{texto_opcion}' no lleva identificador 'O-n'")
@@ -1274,16 +2615,27 @@ def comprobar_opcion(opcion: Opcion, informe: Informe, contrato: dict | None = N
             f"sección 5: {nombre}: el cuadrante declarado es '{opcion.cuadrante}' y con impacto {opcion.impacto}"
             f" y esfuerzo {opcion.esfuerzo} corresponde '{calculado}'"
         )
-    if opcion.decision != "elegida":
+    regla_base = contrato_act["reglas"].get("base_prediccion")
+    if opcion.decision == "elegida":
+        if (calculado or opcion.cuadrante) == "Eliminar":
+            informe.error(f"sección 5: {nombre} está elegida y cae en 'Eliminar' (impacto bajo, esfuerzo alto)")
+        if opcion.prediccion is None:
+            return
+        if not tiene_texto_real(opcion.prediccion):
+            informe.error(f"sección 5: {nombre} está elegida y no tiene Predicción (qué medida cambia y cuánto)")
+            return
+        if not re.search(r"\d", opcion.prediccion):
+            informe.aviso(f"sección 5: {nombre}: la Predicción no tiene cifra; di qué medida cambia y cuánto")
+        if regla_base in ("elegida", "toda"):
+            err_base = _mensaje_error_base_prediccion(nombre, opcion.decision, opcion.prediccion)
+            if err_base is not None:
+                informe.error(err_base)
         return
-    if (calculado or opcion.cuadrante) == "Eliminar":
-        informe.error(f"sección 5: {nombre} está elegida y cae en 'Eliminar' (impacto bajo, esfuerzo alto)")
-    if opcion.prediccion is None:
-        return
-    if not tiene_texto_real(opcion.prediccion):
-        informe.error(f"sección 5: {nombre} está elegida y no tiene Predicción (qué medida cambia y cuánto)")
-    elif not re.search(r"\d", opcion.prediccion):
-        informe.aviso(f"sección 5: {nombre}: la Predicción no tiene cifra; di qué medida cambia y cuánto")
+
+    if regla_base == "toda" and opcion.prediccion is not None and tiene_texto_real(opcion.prediccion):
+        err_base = _mensaje_error_base_prediccion(nombre, opcion.decision, opcion.prediccion)
+        if err_base is not None:
+            informe.error(err_base)
 
 
 def valor_cerrado(
@@ -1500,7 +2852,19 @@ def validar_formato_anterior(texto: str, doc: Documento, contrato: dict | None =
     """Reglas de la v1.1.1 (la culpa se mira solo en la línea de causa raíz) y lo que falta para el nuevo."""
     contrato_act = contrato or cargar_contrato(1)
     rotulos_7 = tuple(contrato_act["rotulos_7"])
-    informe = Informe(etapa=None, origen_etapa="formato anterior", formato="anterior")
+    informe = Informe(
+        etapa=None,
+        origen_etapa="formato anterior",
+        formato="anterior",
+        contrato=None,
+        origen_contrato="formato anterior v1.1.1",
+    )
+    val_contrato_cab, errores_formato_contrato, total_lineas_contrato = _analizar_contrato_cabecera(doc.cabecera)
+    for err_c in errores_formato_contrato:
+        informe.error(err_c)
+    if not errores_formato_contrato and val_contrato_cab is None and total_lineas_contrato == 0:
+        if _tiene_rasgos_contrato_3(doc):
+            informe.error("Cabecera: falta - **Contrato:** 3")
     lineas = doc.lineas
     no_vacias = sum(1 for linea in lineas if linea.strip())
     if no_vacias > MAX_LINEAS:
@@ -1564,12 +2928,12 @@ def armar_uso(etapas: Sequence[str]) -> str:
 Uso: validar-a3.py [--etapa ETAPA] [--raiz CARPETA] <archivo-a3.md>
 
 Valida un A3 de TAS: los errores de pensamiento lo rechazan y los avisos de forma no.
-Lee '- **Contrato:** 1|2' de la cabecera (1 si falta; con 2 exige las cuatro formas de fuente).
+Lee '- **Contrato:** 1|2|3' de la cabecera (1 si falta; con 2 y 3 exige las cuatro formas de fuente).
 
 Opciones:
   --etapa ETAPA   valida contra lo que exige esa etapa: {lista(etapas)}.
                   Sin la opción, se lee la línea Etapa de la cabecera.
-  --raiz CARPETA  carpeta raíz del proyecto para resolver rutas de fuentes (contrato 2);
+  --raiz CARPETA  carpeta raíz del proyecto para resolver rutas de fuentes (contratos 2 y 3);
                   sustituye a la búsqueda de .git hacia arriba.
   -h, --help      muestra esta ayuda.
 
@@ -1657,12 +3021,18 @@ def imprimir(informe: Informe, nombre: str) -> None:
     print(f"=== Validación A3: {nombre} ===")
     if informe.formato == "anterior":
         print("Formato anterior (v1.1.1) reconocido: se aplican sus reglas y se dice qué falta para el formato nuevo.")
+        print(f"Contrato: ninguno ({informe.origen_contrato or 'formato anterior v1.1.1'})")
     elif informe.formato == "sin_estructura":
-        pass
-    elif informe.etapa:
-        print(f"Etapa: {informe.etapa} ({informe.origen_etapa})")
+        print(f"Contrato: sin determinar ({informe.origen_contrato or 'archivo vacío o sin estructura de A3'})")
     else:
-        print("Etapa: sin determinar; solo se revisan la cabecera y el límite de una página")
+        if informe.etapa:
+            print(f"Etapa: {informe.etapa} ({informe.origen_etapa})")
+        else:
+            print("Etapa: sin determinar; solo se revisan la cabecera y el límite de una página")
+        if informe.contrato is not None:
+            print(f"Contrato: {informe.contrato} ({informe.origen_contrato})")
+        else:
+            print(f"Contrato: sin determinar ({informe.origen_contrato or 'cabecera inválida'})")
     if informe.errores:
         print(f"\nErrores de pensamiento ({len(informe.errores)}), rechazan el A3:")
         for error in informe.errores:

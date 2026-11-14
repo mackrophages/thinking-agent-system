@@ -1,5 +1,5 @@
 {
-  "vigente": 2,
+  "vigente": 3,
   "versiones": {
     "1": {
       "etapas": ["comprender", "analizar", "proponer", "planear", "cerrar"],
@@ -40,6 +40,34 @@
       "columnas_opciones": ["Opción", "Causa", "Nivel", "Impacto", "Esfuerzo", "Cuadrante", "Decisión", "Predicción"],
       "rotulos_7": ["Predicho contra real", "Qué puede salir mal y cómo lo veremos", "Próxima revisión", "Estandarización"],
       "reglas": {"fuentes": "cuatro_formas", "fila_supuesto": "obligatoria", "a3_provisional": "no", "amef": null}
+    },
+    "3": {
+      "etapas": ["comprender", "analizar", "proponer", "planear", "cerrar"],
+      "ultima_seccion": {"comprender": 2, "analizar": 4, "proponer": 5, "planear": 6, "cerrar": 7},
+      "ramas": ["Método", "Máquina", "Material", "Medición", "Medio", "Relevo"],
+      "subramas": {},
+      "estados_rama": ["FOCO", "DESCARTADA"],
+      "niveles": ["curita", "raíz", "poka-yoke"],
+      "cuadrantes": ["Implementar", "Desafío", "Posible", "Eliminar"],
+      "pick": [
+        {"impacto": "alto", "esfuerzo": "bajo", "cuadrante": "Implementar"},
+        {"impacto": "alto", "esfuerzo": "alto", "cuadrante": "Desafío"},
+        {"impacto": "bajo", "esfuerzo": "bajo", "cuadrante": "Posible"},
+        {"impacto": "bajo", "esfuerzo": "alto", "cuadrante": "Eliminar"}
+      ],
+      "decisiones": ["elegida", "después", "descartada"],
+      "ventanas": ["5 h", "20 h", "1 semana", "más de 1 semana"],
+      "columnas_opciones": ["Opción", "Causa", "Nivel", "Impacto", "Esfuerzo", "Cuadrante", "Decisión", "Predicción"],
+      "rotulos_7": ["Predicho contra real", "Qué puede salir mal y cómo lo veremos", "Próxima revisión", "Estandarización"],
+      "reglas": {
+        "fuentes": "cuatro_formas",
+        "fila_supuesto": "obligatoria",
+        "a3_provisional": "no",
+        "amef": null,
+        "fuente_mapa": "cuatro_formas",
+        "sin_medir_hasta": "analizar",
+        "base_prediccion": "toda"
+      }
     }
   }
 }

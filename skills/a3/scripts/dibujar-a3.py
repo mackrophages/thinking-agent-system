@@ -87,10 +87,16 @@ def _validar_entrada_contrato(ruta: Path, ver: str, c: object) -> None:
     reglas = c["reglas"]
     if not isinstance(reglas, dict) or any(k not in reglas for k in _CLAVES_REGLAS):
         _fallar_contrato_json(ruta, "faltan claves obligatorias en 'reglas'")
+    for clave_txt in ("fuente_mapa", "base_prediccion"):
+        if reglas.get(clave_txt) is not None and (
+            not isinstance(reglas[clave_txt], str) or not reglas[clave_txt]
+        ):
+            _fallar_contrato_json(ruta, f"'{clave_txt}' en 'reglas' debe ser texto no vacío o null")
+    if reglas.get("sin_medir_hasta") is not None and reglas["sin_medir_hasta"] not in c["etapas"]:
+        _fallar_contrato_json(ruta, "'sin_medir_hasta' debe ser una etapa válida del contrato")
 
 
-def cargar_contrato(numero: int | None = None) -> dict:
-    """Lee skills/a3/references/contrato-a3.json y devuelve el diccionario del contrato pedido."""
+def _leer_datos_contrato_json() -> dict:
     ruta = Path(__file__).resolve().parent.parent / "references" / "contrato-a3.json"
     try:
         crudo = ruta.read_text(encoding="utf-8")
@@ -115,6 +121,25 @@ def cargar_contrato(numero: int | None = None) -> dict:
         _fallar_contrato_json(ruta, f"la versión vigente '{vigente}' no existe en 'versiones'")
     for ver, entrada in versiones.items():
         _validar_entrada_contrato(ruta, str(ver), entrada)
+    return datos
+
+
+def _texto_versiones_validas(datos: dict | None = None) -> str:
+    cargado = datos if datos is not None else _leer_datos_contrato_json()
+    claves = sorted(
+        (str(k) for k in cargado["versiones"].keys()),
+        key=lambda k: (0, int(k)) if k.isdigit() else (1, k),
+    )
+    if len(claves) == 1:
+        return claves[0]
+    return f"{', '.join(claves[:-1])} y {claves[-1]}"
+
+
+def cargar_contrato(numero: int | None = None) -> dict:
+    """Lee skills/a3/references/contrato-a3.json y devuelve el diccionario del contrato pedido."""
+    datos = _leer_datos_contrato_json()
+    vigente = datos["vigente"]
+    versiones = datos["versiones"]
     clave = str(vigente) if numero is None else str(numero)
     return dict(versiones[clave])
 
@@ -198,6 +223,7 @@ class StateMapStep:
     duration: str
     problem: str
     has_problem: bool
+    source: str = ""
 
 
 @dataclass
@@ -1307,8 +1333,24 @@ def is_state_map_table(table: MarkdownTable, h3_title: str | None) -> bool:
     return first_col == "paso" and fourth_col.startswith("problema")
 
 
-def parse_state_map_table(table: MarkdownTable, kind: str) -> list[StateMapStep]:
-    if len(table.headers) < 4:
+def parse_state_map_table(
+    table: MarkdownTable, kind: str, contrato: dict | None = None
+) -> list[StateMapStep]:
+    exige_fuente = bool(
+        contrato and contrato.get("reglas", {}).get("fuente_mapa") == "cuatro_formas"
+    )
+    if exige_fuente:
+        quinta = (
+            _sin_acentos(strip_md_inline(table.headers[4])).lower()
+            if len(table.headers) >= 5
+            else ""
+        )
+        if len(table.headers) < 5 or not quinta.startswith("fuente"):
+            raise ContractError(
+                f"La tabla 'Mapa del estado {kind}' debe tener las 5 columnas del contrato 3: "
+                "Paso | Quién | Tiempo | Problema | Fuente."
+            )
+    elif len(table.headers) < 4:
         raise ContractError(
             f"La tabla 'Mapa del estado {kind}' debe tener las 4 columnas del contrato: "
             "Paso | Quién | Tiempo | Problema."
@@ -1316,16 +1358,18 @@ def parse_state_map_table(table: MarkdownTable, kind: str) -> list[StateMapStep]
     if not table.rows:
         raise ContractError(f"La tabla 'Mapa del estado {kind}' no tiene pasos.")
 
+    min_cols = 5 if exige_fuente else 4
     steps: list[StateMapStep] = []
     for idx, row in enumerate(table.rows):
-        if len(row) < 4:
+        if len(row) < min_cols:
             raise ContractError(
-                f"La fila {idx + 1} de 'Mapa del estado {kind}' tiene menos de 4 columnas."
+                f"La fila {idx + 1} de 'Mapa del estado {kind}' tiene menos de {min_cols} columnas."
             )
         step_txt = row[0].strip()
         who_txt = row[1].strip()
         time_txt = row[2].strip()
         prob_txt = row[3].strip()
+        source_txt = row[4].strip() if len(row) >= 5 else ""
         if not step_txt:
             raise ContractError(
                 f"El nombre del paso en la fila {idx + 1} de 'Mapa del estado {kind}' está vacío."
@@ -1338,6 +1382,7 @@ def parse_state_map_table(table: MarkdownTable, kind: str) -> list[StateMapStep]
                 duration=time_txt or "-",
                 problem=prob_txt,
                 has_problem=has_prob,
+                source=source_txt,
             )
         )
     return steps
@@ -1437,12 +1482,14 @@ def parse_a3_markdown(md_text: str) -> A3Document:
             try:
                 contrato_act = cargar_contrato(int(val_contrato))
             except KeyError:
+                validos_txt = _texto_versiones_validas()
                 raise ContractError(
-                    f"Cabecera: el Contrato '{val_contrato}' no existe; los válidos son 1 y 2"
+                    f"Cabecera: el Contrato '{val_contrato}' no existe; los válidos son {validos_txt}"
                 ) from None
         else:
+            validos_txt = _texto_versiones_validas()
             raise ContractError(
-                f"Cabecera: el Contrato '{val_contrato}' no existe; los válidos son 1 y 2"
+                f"Cabecera: el Contrato '{val_contrato}' no existe; los válidos son {validos_txt}"
             )
     stages_order = _construir_orden_etapas(contrato_act)
     stage_index = {key: idx for idx, (key, _, _) in enumerate(stages_order)}
@@ -1544,9 +1591,9 @@ def parse_a3_markdown(md_text: str) -> A3Document:
         for h3_title, tbl in extract_tables_from_lines(sec.raw_lines):
             kind = state_map_kind_from_h3(h3_title)
             if kind == "presente":
-                present_map = parse_state_map_table(tbl, "presente")
+                present_map = parse_state_map_table(tbl, "presente", contrato=contrato_act)
             elif kind == "futuro":
-                future_map = parse_state_map_table(tbl, "futuro")
+                future_map = parse_state_map_table(tbl, "futuro", contrato=contrato_act)
 
     return A3Document(
         title=title,

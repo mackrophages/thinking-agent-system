@@ -4,7 +4,7 @@
 - **Coach / Revisor:** <quien pregunta; "pendiente" solo vale en comprender>
 - **Versión:** 1 (<fecha AAAA-MM-DD>)
 - **Etapa:** comprender | analizar | proponer | planear | cerrar
-- **Contrato:** 2
+- **Contrato:** 3
 - **Objetivo que apoya:** <meta mayor o A3 padre; opcional>
 
 ## 1. Contexto y Desperdicio (Muda) Observado
@@ -18,6 +18,12 @@
 | <dato medido, con su cifra> | <fuente: ruta:línea, comando -> ruta, https://... o evidencia: ruta> |
 
 - **Brecha:** de <X medido> (medido) a <Y meta> (meta) para <cuándo se espera>
+
+### Mapa del estado presente
+
+| Paso | Quién | Tiempo | Problema | Fuente |
+| :--- | :--- | :--- | :--- | :--- |
+| 1. <paso actual> | <componente o agente> | <duración medida> | <problema o ninguno> | <fuente o [SIN MEDIR] hasta analizar> |
 
 ## 3. Meta y Criterio de Aceptación
 - **Meta:** <resultado medible que cierra la brecha>
@@ -54,8 +60,14 @@
 
 | Opción | Causa | Nivel | Impacto | Esfuerzo | Cuadrante | Decisión | Predicción |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| O-1 <nombre corto> | <letra o síntoma> | <curita, raíz o poka-yoke> | <alto o bajo> | <bajo o alto> (<5 h, 20 h, 1 semana o más de 1 semana>) | <Implementar, Desafío, Posible o Eliminar> | <elegida, después o descartada> | <qué medida cambia y cuánto> |
-| O-2 <nombre corto> | <letra o síntoma> | <curita, raíz o poka-yoke> | <alto o bajo> | <bajo o alto> (<5 h, 20 h, 1 semana o más de 1 semana>) | <Implementar, Desafío, Posible o Eliminar> | <elegida, después o descartada> | <qué medida cambia y cuánto> |
+| O-1 <nombre corto> | <letra o síntoma> | <curita, raíz o poka-yoke> | <alto o bajo> | <bajo o alto> (<5 h, 20 h, 1 semana o más de 1 semana>) | <Implementar, Desafío, Posible o Eliminar> | <elegida, después o descartada> | <qué medida cambia y cuánto> (base: <medición o supuesto>) |
+| O-2 <nombre corto> | <letra o síntoma> | <curita, raíz o poka-yoke> | <alto o bajo> | <bajo o alto> (<5 h, 20 h, 1 semana o más de 1 semana>) | <Implementar, Desafío, Posible o Eliminar> | <elegida, después o descartada> | <qué medida cambia y cuánto> (base: <medición o supuesto>) |
+
+### Mapa del estado futuro
+
+| Paso | Quién | Tiempo | Problema | Fuente |
+| :--- | :--- | :--- | :--- | :--- |
+| 1. <paso futuro> | <componente o agente> | <duración esperada> | <problema restante o ninguno> | <fuente o (base: de dónde sale)> |
 
 ## 6. Plan de Ejecución PDCA y Ventana de Despliegue
 | Paso | Acción | Responsable | Verificación |
