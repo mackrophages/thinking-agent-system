@@ -1,0 +1,52 @@
+{
+  "description": "Lean AgentOps: inyección de reglas del Elefante en SessionStart y sensor silencioso Goldfish fuera de banda",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/session_start_rules.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "_D=\"${TAS_PROJECT_DIR:-${LEAN_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}}\"; if [ -d \"$_D/.tas\" ] || [ -d \"$_D/.lean_observer\" ]; then exec python3 \"${CLAUDE_PLUGIN_ROOT:-.}/scripts/goldfish_sensor.py\" --platform claude --event PostToolUse; else printf '{}\\n'; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "_D=\"${TAS_PROJECT_DIR:-${LEAN_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}}\"; if [ -d \"$_D/.tas\" ] || [ -d \"$_D/.lean_observer\" ]; then exec python3 \"${CLAUDE_PLUGIN_ROOT:-.}/scripts/goldfish_sensor.py\" --platform claude --event PostToolUseFailure; else printf '{}\\n'; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "_D=\"${TAS_PROJECT_DIR:-${LEAN_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}}\"; if [ -d \"$_D/.tas\" ] || [ -d \"$_D/.lean_observer\" ]; then exec python3 \"${CLAUDE_PLUGIN_ROOT:-.}/scripts/goldfish_sensor.py\" --platform claude --event Stop; else printf '{}\\n'; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

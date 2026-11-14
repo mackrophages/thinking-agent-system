@@ -1,0 +1,18 @@
+{
+  "name": "tas-tablero",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "construir": "node construir.mjs",
+    "comprobar": "node construir.mjs --comprobar"
+  },
+  "dependencies": {
+    "@tanstack/react-charts": "1.1.0",
+    "@tanstack/react-table": "8.21.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

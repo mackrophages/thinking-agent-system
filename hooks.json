@@ -1,0 +1,23 @@
+{
+  "tas-goldfish-sensor": {
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "in=\"\"; while IFS= read -r line || [ -n \"$line\" ]; do in=\"${in}${line}\"; done; q='\"'; ws=${in#*${q}workspacePaths${q}*[*${q}}; if [ \"$ws\" = \"$in\" ]; then ws=\"\"; else ws=${ws%%${q}*}; fi; _D=\"${ws:-${TAS_PROJECT_DIR:-${LEAN_PROJECT_DIR:-.}}}\"; if [ -d \"$_D/.tas\" ] || [ -d \"$_D/.lean_observer\" ]; then printf '%s\\n' \"$in\" | exec python3 \"${PLUGIN_ROOT:-.}/scripts/goldfish_sensor.py\" --platform agy --event PostToolUse; else printf '{}\\n'; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "in=\"\"; while IFS= read -r line || [ -n \"$line\" ]; do in=\"${in}${line}\"; done; q='\"'; ws=${in#*${q}workspacePaths${q}*[*${q}}; if [ \"$ws\" = \"$in\" ]; then ws=\"\"; else ws=${ws%%${q}*}; fi; _D=\"${ws:-${TAS_PROJECT_DIR:-${LEAN_PROJECT_DIR:-.}}}\"; if [ -d \"$_D/.tas\" ] || [ -d \"$_D/.lean_observer\" ]; then printf '%s\\n' \"$in\" | exec python3 \"${PLUGIN_ROOT:-.}/scripts/goldfish_sensor.py\" --platform agy --event Stop; else printf '{}\\n'; fi",
+        "timeout": 10
+      }
+    ]
+  }
+}

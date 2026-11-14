@@ -1,0 +1,27 @@
+{
+  "name": "tas",
+  "displayName": "TAS: Thinking Agent System",
+  "version": "2.0.0",
+  "description": "Thinking Agent System: Filosofía operativa Lean, A3 de una página, 5 porqués sin curitas, verificación en el Gemba, revisión con ojos frescos, Kaizen (5h/20h/1sem), Jugadas VSM y Lean AgentOps con Observador Goldfish.",
+  "author": {
+    "name": "Equipo Lean AgentOps"
+  },
+  "license": "MIT",
+  "keywords": [
+    "lean",
+    "agentops",
+    "goldfish",
+    "a3",
+    "gemba",
+    "5-porques",
+    "poka-yoke",
+    "kaizen",
+    "vsm"
+  ],
+  "agents": [
+    "./.claude-plugin/agents/auditor-gemba.md",
+    "./.claude-plugin/agents/critico-causa-raiz.md",
+    "./.claude-plugin/agents/lector-primera-visita.md",
+    "./.claude-plugin/agents/observador-goldfish.md"
+  ]
+}

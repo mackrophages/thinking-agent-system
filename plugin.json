@@ -1,0 +1,11 @@
+{
+  "name": "tas",
+  "displayName": "TAS: Thinking Agent System",
+  "version": "2.0.0",
+  "description": "Thinking Agent System: Filosofía operativa Lean, A3 de una página, 5 porqués sin curitas, verificación en el Gemba, revisión con ojos frescos, Kaizen (5h/20h/1sem), Jugadas VSM y Lean AgentOps con Observador Goldfish.",
+  "author": {
+    "name": "Equipo Lean AgentOps"
+  },
+  "license": "MIT",
+  "logo": "assets/icon.svg"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "tas",
+  "description": "Catálogo local de TAS (Thinking Agent System): Mejora Continua, Gemba, Jugadas VSM y Lean AgentOps con Observador Silencioso Goldfish.",
+  "owner": {
+    "name": "Equipo Lean AgentOps"
+  },
+  "plugins": [
+    {
+      "name": "tas",
+      "source": "./",
+      "description": "Thinking Agent System: Filosofía operativa Lean, A3 de una página, 5 porqués sin curitas, verificación en el Gemba, revisión con ojos frescos, Kaizen (5h/20h/1sem), Jugadas VSM y Lean AgentOps con Observador Goldfish."
+    }
+  ]
+}

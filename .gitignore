@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+*.log
+!skills/a3/resources/ejemplo-respaldo.log
+.DS_Store

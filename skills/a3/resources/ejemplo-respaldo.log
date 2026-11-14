@@ -1,0 +1,5 @@
+2026-10-12 03:18:44 ERROR restaurar-prueba: el archivo de respaldo termina a mitad de la tabla movimientos (3 de 10 volcados de octubre no se restauran).
+2026-10-31 04:00:00 INFO programador-tareas: duraciones de los 3 volcados fallidos de octubre: 31m12s, 33m04s y 34m48s (todos mayores de 30 min).
+2026-10-31 04:01:00 INFO journalctl -u respaldo: las 10 ejecuciones nocturnas de octubre finalizaron con codigo de salida 0.
+2026-10-31 04:02:00 INFO du -sh /var/lib/datos: serie semanal junio-octubre: 6,0 GB -> 7,2 GB -> 8,5 GB -> 9,8 GB -> 11,0 GB.
+2026-11-01 09:15:00 INFO prueba-tuberia: timeout 1 sh -c 'sleep 2 | gzip' >/dev/null sin pipefail termina con codigo de salida 0.
