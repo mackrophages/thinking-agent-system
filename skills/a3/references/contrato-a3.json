@@ -67,6 +67,11 @@
         "fuente_mapa": "cuatro_formas",
         "sin_medir_hasta": "analizar",
         "base_prediccion": "toda"
+      },
+      "topes": {
+        "celda": 30,
+        "vineta": 40,
+        "total": 1500
       }
     }
   }

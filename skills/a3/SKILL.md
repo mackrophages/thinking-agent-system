@@ -45,7 +45,7 @@ tiempo es inventar la causa o la solución. Hasta cerrar, el documento termina c
 ## Qué pensamiento se exige
 
 1. **Contexto (1):** por qué importa ahora, qué desperdicio se ve y la pregunta cero.
-2. **Gemba (2):** solo hechos, cada uno con su fuente, y la línea `- **Brecha:** de X (medido) a Y (meta) para <cuándo>`.
+2. **Gemba (2):** solo hechos, cada uno con su fuente, y la línea `- **Brecha:** <indicador>: de <actual> (medido) a <meta> (meta) para <cuándo>`. En el contrato 3 el indicador es obligatorio y, apenas la Brecha está escrita, el título tiene que nombrar su indicador y su meta (`# A3: <indicador>: de <actual> a <meta>`); mientras la Brecha sea la muestra de la plantilla, el título es libre.
 3. **Meta (3):** resultado medible y el criterio que confirma que quedó resuelto a la primera.
 4. **Causa raíz (4):** tabla Verificado / Supuesto; Ishikawa de seis ramas (Método, Máquina,
    Material, Medición, Medio, Relevo) cuando hay dos o más hipótesis, o la línea "Ishikawa: no aplica";
@@ -59,9 +59,7 @@ tiempo es inventar la causa o la solución. Hasta cerrar, el documento termina c
    (el compromiso de `KAIZEN.md` si existe) y dónde quedó estandarizado.
 
 En el contrato `3` los mapas de estado presente (sección 2, desde `comprender`) y futuro (sección 5, desde `proponer`) son obligatorios, uno por sección y nunca fuera de esas dos secciones; su forma de cinco columnas
-(`Paso | Quién | Tiempo | Problema | Fuente`) está en la plantilla y en el ejemplo. En el mapa futuro la
-columna `Problema` dice lo que todavía queda sin resolver en ese paso (`ninguno` si queda limpio); lo que
-cambia se escribe en el nombre del paso.
+(`Paso | Quién | Tiempo | Problema | Fuente`) está en la plantilla y en el ejemplo. En el mapa presente, el paso donde ocurre una causa marca su **estallido kaizen** empezando `Problema` con la letra de su causa en `4b` (por ejemplo `[A] timeout corta el volcado`): desde `analizar`, un `[X]` sin causa en `4b` para la línea y una causa de `4b` sin estallido en el mapa presente da aviso. En el mapa futuro los estallidos ya están resueltos (un `[X]` ahí da aviso) y `Problema` dice solo lo que queda sin resolver (`ninguno` si queda limpio); lo que cambia se escribe en el nombre del paso.
 
 ## Flujo de trabajo
 
@@ -83,11 +81,14 @@ cambia se escribe en el nombre del paso.
    forma exacta de la plantilla (línea Contrato, títulos y encabezado de los mapas, filas con `|` al
    principio y al final, la base): lo que se le parezca sin coincidir para la línea y el mensaje muestra
    la forma correcta. `[PARAR LÍNEA]` rechaza (salida 1); `[AVISO]` no rechaza; la salida 2 es un
-   error de uso. Se conserva el límite de 160 líneas no vacías y la detección del formato v1.1.1.
+   error de uso. En contrato 3 también avisa, sin parar la línea, cuando se superan los topes de palabras
+   de `contrato-a3.json` (`30` por celda, `40` por viñeta y `1500` en total, sin contar bloques de código).
+   Se conserva el límite de 160 líneas no vacías y la detección del formato v1.1.1.
 4. Para verlo dibujado (etapa, mapas, Ishikawa y matriz PICK en una página HTML de un solo archivo,
    sin red, que se abre en el teléfono o el navegador):
    ```bash
    python3 <ruta-al-plugin>/skills/a3/scripts/dibujar-a3.py <ruta-a-tu-a3.md> -o <ruta-a-tu-a3.html>
    ```
    El Markdown sigue siendo la fuente: se razona y se valida ahí, y el dibujo se vuelve a generar.
+   En la Brecha, las cifras se leen con punto decimal y coma de miles en grupos de tres dígitos (`1,250.5`, `4.125`); otro formato cae a texto destacado.
 5. En cambios críticos, pásalo por `ojos-frescos` antes de ejecutar el plan.

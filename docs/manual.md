@@ -2,7 +2,7 @@
 
 Este manual es para quien instala TAS por primera vez y quiere usarlo en su trabajo de todos los días. No hace falta haber leído nada antes. Va de lo simple a lo completo: qué es, cómo se instala, un caso entero de principio a fin, cada pieza por separado y qué hacer cuando algo falla.
 
-Los bloques de comandos marcados como ejecutables se probaron de verdad contra la versión 2.1.0. Corren tal cual, en una carpeta vacía, si defines antes la variable `TAS_REPO`.
+Los bloques de comandos marcados como ejecutables se probaron de verdad contra la versión 2.2.0. Corren tal cual, en una carpeta vacía, si defines antes la variable `TAS_REPO`.
 
 ## 1. Qué es TAS y qué cambia al instalarlo
 TAS (*Thinking Agent System*) es un plugin libre en español para agentes de código (Claude Code, Antigravity y OpenCode). Le enseña al agente a trabajar con el método Lean AgentOps: parar cuando algo falla, ir a mirar el lugar real antes de afirmar, pensar en una página antes de construir y dejar por escrito lo que se aprendió.
@@ -76,7 +76,7 @@ for s in a3 5-porques agent-ops gemba goldfish-observer kaizen ojos-frescos; do
   cp -r "$TAS_REPO/skills/$s" "$DEST_OC/skills/tas-$s"
   sed -i "s/^name: $s\$/name: tas-$s/" "$DEST_OC/skills/tas-$s/SKILL.md"
 done
-{ printf '<!-- TAS v2.1.0: reglas siempre activas, copia de rules/AGENTS.md del plugin -->\n\n'
+{ printf '<!-- TAS v2.2.0: reglas siempre activas, copia de rules/AGENTS.md del plugin -->\n\n'
   cat "$TAS_REPO/rules/AGENTS.md"; } > "$DEST_OC/AGENTS.md"
 python3 - "$DEST_OC" <<'PY'
 import pathlib, sys
@@ -178,12 +178,12 @@ Hechos verificados: en `resumen.py` (líneas 6 a 10) el `except` salta la fila s
 La **curita** tentadora sería cambiar la coma por punto dentro del script: tapa el síntoma de hoy y deja vivo el mecanismo que calla los errores. La contramedida de raíz es que el resumen deje de callar, y el **poka-yoke** es una prueba que falle si las cuentas no cuadran. Como hay más de una causa posible y el arreglo no es trivial, esto merece un A3.
 
 ### 3.3 El A3, etapa por etapa (`a3`)
-El A3 no se llena de golpe: se avanza por etapas y cada una se revisa con el coach (quien pregunta, no escribe). Para un A3 propio se parte de `skills/a3/resources/plantilla-a3-interno.md`, que ya trae los títulos exactos que exige `validar-a3.py` (con tope de 160 líneas no vacías para que quepa en una página) y la línea `- **Contrato:** 3` en la cabecera (los A3 con contrato `2` o sin línea `Contrato`, que usa el `1`, siguen validando igual). Con el contrato `3`, cada hecho de la sección 2 y cada fila `**Verificado**` de la sección 4 debe citar fuentes que se puedan abrir en una de **cuatro formas** (o varias separadas por `;` fuera de comillas invertidas): `ruta:N` o rango `ruta:N-M`, `` `comando` -> ruta ``, `https://...` o `evidencia: ruta` (relativas a la carpeta del A3 o a la raíz del proyecto con `.git` o `--raiz`); además, lleva los mapas de estado presente (sec. 2, desde `comprender`) y futuro (sec. 5, desde `proponer`), uno por sección y con columna `Fuente`, y cada predicción de la sección 5 declara su `base:`. Etapa 1, **comprender**: solo contexto y hechos medidos.
+El A3 no se llena de golpe: se avanza por etapas y cada una se revisa con el coach (quien pregunta, no escribe). Para un A3 propio se parte de `skills/a3/resources/plantilla-a3-interno.md`, que ya trae los títulos exactos que exige `validar-a3.py` (con tope de 160 líneas no vacías para que quepa en una página) y la línea `- **Contrato:** 3` en la cabecera (los A3 con contrato `2` o sin línea `Contrato`, que usa el `1`, siguen validando igual). Con el contrato `3`, cada hecho de la sección 2 y cada fila `**Verificado**` de la sección 4 debe citar fuentes que se puedan abrir en una de **cuatro formas** (o varias separadas por `;` fuera de comillas invertidas): `ruta:N` o rango `ruta:N-M`, `` `comando` -> ruta ``, `https://...` o `evidencia: ruta` (relativas a la carpeta del A3 o a la raíz del proyecto con `.git` o `--raiz`); además, la Brecha exige su indicador delante (`- **Brecha:** <indicador>: de <actual> (medido) a <meta> (meta) para <cuándo>`) y apenas la Brecha tiene contenido real el título la nombra con su indicador y su meta (`# A3: <indicador>: de <actual> a <meta>`; antes de eso el título es libre), van los mapas de estado presente (sec. 2, desde `comprender`) y futuro (sec. 5, desde `proponer`) con columna `Fuente` y estallidos kaizen `[A]` enlazados con las causas de `4b`, cada predicción de la sección 5 declara su `base:`, y el validador avisa sin parar si se pasan los topes de `30` palabras por celda, `40` por viñeta o `1500` en total. Etapa 1, **comprender**: solo contexto y hechos medidos.
 
 <!-- ejecutable -->
 ```bash
 cat > a3-resumen.md <<'EOF'
-# A3: el resumen diario de pedidos informa 4 pedidos de 6 y no avisa
+# A3: pedidos descartados en silencio: de 2 de 6 a 0 de 6
 - **Propietario:** agente de la tienda en línea
 - **Coach / Revisor:** responsable de contabilidad
 - **Versión:** 1 (2026-11-12)
@@ -201,13 +201,14 @@ cat > a3-resumen.md <<'EOF'
 | `pedidos.csv` tiene 6 pedidos y el resumen cuenta 4 | `python3 resumen.py pedidos.csv` -> salida-resumen.txt; `tail -n +2 pedidos.csv \| wc -l` -> salida-resumen.txt |
 | Los pedidos 102 y 104 no se suman: sus totales son `12,50` y `1.250,00` | pedidos.csv:3; pedidos.csv:5 |
 | El total informado es 130.50 y la suma real es 1393.00 | salida-resumen.txt:2; pedidos.csv:2-7 |
-- **Brecha:** de 2 de 6 pedidos descartados en silencio (medido) a 0 de 6 (meta) para el 2026-11-20
+- **Brecha:** pedidos descartados en silencio: de 2 de 6 (medido) a 0 de 6 (meta) para el 2026-11-20
 
 ### Mapa del estado presente
 | Paso | Quién | Tiempo | Problema | Fuente |
 | :--- | :--- | :--- | :--- | :--- |
+| Exportar `pedidos.csv` | tienda en línea | diario | entran totales con coma decimal | pedidos.csv:3; pedidos.csv:5 |
 | Leer y sumar `pedidos.csv` | `resumen.py` | real en archivo | salta totales con coma sin avisar | tiempo-resumen.txt:1; resumen.py:6-10 |
-| Contar filas contra resumen | agente | real en archivo | solo miraba código 0 sin cotejar | tiempo-conteo.txt:1; salida-resumen.txt:1-3 |
+| Contar filas contra resumen | cierre diario | real en archivo | solo miraba código 0 sin cotejar | tiempo-conteo.txt:1; salida-resumen.txt:1-3 |
 
 ## Siguientes pasos
 - Pasar a la etapa analizar: meta, Ishikawa y porqués con el coach.
@@ -229,11 +230,12 @@ Avisos de forma (1), no rechazan:
 [AVISO] la opción --etapa (analizar) manda sobre la Etapa de la cabecera (comprender)
 Resultado: RECHAZADO (2 errores de pensamiento, 1 avisos de forma).
 ```
-Etapa 2, **analizar**: la meta y la causa raíz. Aquí van el **Ishikawa** (seis ramas: Método, Máquina, Material, Medición, Medio y Relevo; cada una queda en FOCO o DESCARTADA con su evidencia) y los porqués de cada causa en foco. Quitamos el cierre anterior, subimos la etapa y agregamos las secciones 3 y 4:
+Etapa 2, **analizar**: la meta y la causa raíz. Aquí van el **Ishikawa** (seis ramas: Método, Máquina, Material, Medición, Medio y Relevo; cada una queda en FOCO o DESCARTADA con su evidencia), los porqués de cada causa en foco y los estallidos kaizen `[A]`, `[B]` y `[C]` marcados al inicio de `Problema` en el paso del mapa presente donde ocurre cada causa. Quitamos el cierre anterior, subimos la etapa, marcamos los estallidos y agregamos las secciones 3 y 4:
 <!-- ejecutable -->
 ```bash
 sed -i '/^## Siguientes pasos/,$d' a3-resumen.md
 sed -i 's/^- \*\*Etapa:\*\* .*/- **Etapa:** analizar/; s/^- \*\*Versión:\*\* .*/- **Versión:** 2 (2026-11-12)/' a3-resumen.md
+sed -i 's/| entran totales con coma decimal |/| [B] entran totales con coma decimal |/; s/| salta totales con coma sin avisar |/| [A] salta totales con coma sin avisar |/; s/| solo miraba código 0 sin cotejar |/| [C] solo miraba código 0 sin cotejar |/' a3-resumen.md
 cat >> a3-resumen.md <<'EOF'
 ## 3. Meta y Criterio de Aceptación
 - **Meta:** el resumen cuenta los 6 pedidos del archivo, o se detiene diciendo cuáles no pudo leer.
@@ -436,7 +438,8 @@ test "$rc" -eq 2
 - **Qué entrega:** un documento de una página por etapas (`comprender`, `analizar`, `proponer`, `planear`, `cerrar`), con su vocabulario cerrado en `skills/a3/references/contrato-a3.json`.
 - **Comandos y fuentes:** `validar-a3.py [--etapa ETAPA] [--raiz CARPETA] <a3.md>` y `dibujar-a3.py`. La plantilla (`resources/plantilla-a3-interno.md`, máx. 160 líneas no vacías) declara `- **Contrato:** 3`: toda fuente de la sección 2 y toda fila `**Verificado**` de la sección 4 debe usar `ruta:N` (o `ruta:N-M`), `` `comando` -> ruta ``, `https://...` o `evidencia: ruta` (separables con `;`), resueltas contra la carpeta del A3 y la raíz del proyecto (`.git` o `--raiz`). Los A3 con contrato `2` o sin línea `Contrato` (contrato `1`) siguen validando igual. Las preguntas del coach están en `references/preguntas-del-coach.md`.
 
-En el contrato `3`, además de esas tablas, los dos mapas son obligatorios desde la etapa de su sección (`### Mapa del estado presente` en la sección 2 desde `comprender` y `### Mapa del estado futuro` en la sección 5 desde `proponer`), uno por sección, una sola tabla por título y nunca fuera de las secciones 2 y 5. Cada mapa lleva exactamente el encabezado `| Paso | Quién | Tiempo | Problema | Fuente |`: el mapa presente admite las cuatro formas o `[SIN MEDIR]` solo hasta `analizar`, el mapa futuro admite las cuatro formas o una `(base: de dónde sale)` sola en la celda, y toda predicción escrita en la sección 5 (sea `elegida`, `después` o `descartada`) declara al menos una `(base: texto)` en texto plano. El contrato 3 exige la forma exacta de la plantilla: un título, un encabezado, una fila o una base que se le parezca sin coincidir para la línea, y el mensaje dice la forma correcta.
+En el contrato `3`, la Brecha exige su indicador delante (`- **Brecha:** <indicador>: de <actual> (medido) a <meta> (meta) para <cuándo>`), el título tiene que contener ese indicador y su meta apenas la Brecha está escrita (`# A3: <indicador>: de <actual> a <meta>`), y los dos mapas son obligatorios desde la etapa de su sección (`### Mapa del estado presente` en la sección 2 desde `comprender` y `### Mapa del estado futuro` en la sección 5 desde `proponer`), uno por sección, una sola tabla por título y nunca fuera de las secciones 2 y 5. Cada mapa lleva exactamente el encabezado `| Paso | Quién | Tiempo | Problema | Fuente |`: el mapa presente admite las cuatro formas o `[SIN MEDIR]` solo hasta `analizar` y enlaza cada **estallido kaizen** empezando `Problema` con `[X]` (letra de su causa en `4b`; desde `analizar`, un `[X]` sin causa en `4b` para la línea y una causa sin estallido avisa), el mapa futuro admite las cuatro formas o una `(base: de dónde sale)` sola en la celda (sin `[X]`, porque ya están resueltos), y toda predicción escrita en la sección 5 (sea `elegida`, `después` o `descartada`) declara al menos una `(base: texto)` en texto plano. Además, `contrato-a3.json` define `topes` de palabras para el contrato 3 (`30` por celda, `40` por viñeta y `1500` en total, sin contar bloques de código cercados), que dan aviso sin parar la línea. El contrato 3 exige la forma exacta de la plantilla: un título, un encabezado, una fila o una base que se le parezca sin coincidir para la línea, y el mensaje dice la forma correcta.
+Al dibujar la Brecha, las cifras se leen con punto decimal y coma de miles en grupos de tres dígitos (`1,250.5`, `4.125`); otro formato cae a texto destacado.
 
 ### 4.4 `ojos-frescos`
 - **Cuándo:** después de redactar un A3, diagnóstico, jugada, plan o tabla técnica, y antes de aprobarlo.

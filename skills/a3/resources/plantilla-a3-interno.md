@@ -1,4 +1,4 @@
-# A3: <título que nombra el problema, no la solución>
+# A3: <indicador>: de <actual> a <meta>
 
 - **Propietario:** <quien responde por el problema>
 - **Coach / Revisor:** <quien pregunta; "pendiente" solo vale en comprender>
@@ -8,6 +8,7 @@
 - **Objetivo que apoya:** <meta mayor o A3 padre; opcional>
 
 ## 1. Contexto y Desperdicio (Muda) Observado
+<topes de palabras: máx. 30 por celda, 40 por viñeta y 1500 en total>
 - **Por qué importa ahora:** <qué flujo o usuario se ve afectado y qué cuesta esperar>
 - **Desperdicio observado:** <defecto, retrabajo, espera, inventario, movimiento o sobreproceso>
 - **Pregunta cero:** <¿se puede disolver o eliminar el problema? "no construir" es la opción cero>
@@ -17,13 +18,13 @@
 | :--- | :--- |
 | <dato medido, con su cifra> | <fuente: ruta:línea, comando -> ruta, https://... o evidencia: ruta> |
 
-- **Brecha:** de <X medido> (medido) a <Y meta> (meta) para <cuándo se espera>
+- **Brecha:** <indicador>: de <X medido> (medido) a <Y meta> (meta) para <cuándo se espera>
 
 ### Mapa del estado presente
 
 | Paso | Quién | Tiempo | Problema | Fuente |
 | :--- | :--- | :--- | :--- | :--- |
-| 1. <paso actual> | <componente o agente> | <duración medida> | <problema o ninguno> | <fuente o [SIN MEDIR] hasta analizar> |
+| 1. <paso actual> | <componente o agente> | <duración medida> | <problema o ninguno; si es un estallido kaizen, empieza con la letra de su causa: [A] ...> | <fuente o [SIN MEDIR] hasta analizar> |
 
 ## 3. Meta y Criterio de Aceptación
 - **Meta:** <resultado medible que cierra la brecha>

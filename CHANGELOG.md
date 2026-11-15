@@ -6,6 +6,34 @@ El repositorio público `thinking-agent-system` nace en la versión **2.0.0** co
 
 ---
 
+## [2.2.0] - 2026-11-15
+
+### El A3 se lee como una historia en una hoja
+
+A partir de "Dirigir para aprender" (Shook): el título y la brecha a la vista, el flujo donde sucede el problema con su estallido kaizen, y poco texto.
+
+- **Título con la brecha:** en el contrato 3, apenas la Brecha está escrita, el título tiene que traer su indicador y su meta: `# A3: <indicador>: de <actual> a <meta>`. Si no, el A3 no aprueba y el mensaje muestra la forma con los valores de la Brecha. Si el título trae `de <X> a <Y>` con cifras, tienen que ser el actual y la meta de la Brecha, aunque lleven un signo delante (`$1,250`, `<200 ms`); un texto de muestra `<...>` sin completar también para la línea.
+- **Brecha con indicador:** `- **Brecha:** <indicador>: de <actual> (medido) a <meta> (meta) para <cuándo>`. En el contrato 3 el indicador es obligatorio. El dibujante la pinta: cuadros si es "N de M", barras si es una sola cifra con su unidad, y texto destacado si no puede leer los números (unidades compuestas como `1 h 30 min`, rangos o dos cifras). Las cifras se leen con la convención de El Salvador: punto decimal y coma de miles (`1,250.5`, `4.125 mA`); los rótulos de las barras son el texto del autor.
+- **Estallidos kaizen:** en el mapa presente, el paso cuyo Problema empieza con `[A]` (una mayúscula entre corchetes) lleva un estallido de la causa A. La letra tiene que existir en la sección 4b; una marca corta mal escrita (`[a]`, `**[B]**`, `[OK]`) para la línea; una causa sin estallido, o un estallido en el mapa futuro, dan aviso. Un corchete con espacios (`[SIN CONFIRMAR]`) no es estallido. El validador y el dibujante leen la brecha, el estallido y las cifras con el mismo módulo, `skills/a3/scripts/lectura-a3.py`.
+- **Menos texto:** avisos, que no paran la línea, cuando una celda pasa de 30 palabras, una viñeta de 40 o el A3 de 1500. El dibujante pone las fuentes al pie, pliega las tablas que ya están dibujadas (mapas e Ishikawa), muestra los porqués en cadena y arma dos columnas en pantallas anchas, sobre hoja blanca.
+
+### Compatibilidad y adopción
+
+- Los contratos 1 y 2 validan igual y se dibujan con el diseño nuevo.
+- Un A3 de contrato 3 escrito con la 2.1.0 necesita, para aprobar en la 2.2.0, el indicador en la Brecha y la brecha en el título. La plantilla y el ejemplo ya vienen así.
+
+### Medida
+
+- El A3 que cerró el contrato 3 medía 13,759 px de alto a 412 px de ancho, unas 15 pantallas de teléfono; con el dibujante nuevo, y reescrito con menos texto, mide 4,573 px.
+- Tres rondas de revisión en frío, una con otra familia de modelo, encontraron 11 errores honestos en el código nuevo: 7, después 4 y al final 1. Todos están corregidos y cubiertos por pruebas.
+
+### Límites conocidos
+
+- Quien escribe las cifras como en España (`1.250,5`) verá su brecha como texto, y una cifra como `4.125`, que en España son miles, se lee como decimal.
+- El validador sigue siendo un poka-yoke contra errores honestos: renombrar o esconder a propósito lo atrapa la revisión en frío.
+
+---
+
 ## [2.1.0] - 2026-11-14
 
 ### Qué agrega el Contrato 3 en el A3

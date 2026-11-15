@@ -19,6 +19,8 @@ Solo biblioteca estándar; Python 3.12 o posterior; sin red.
 
 from __future__ import annotations
 
+import functools
+import importlib.util
 import json
 import re
 import sys
@@ -26,6 +28,23 @@ import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import ModuleType
+
+
+@functools.lru_cache(maxsize=1)
+def _lectura_a3() -> ModuleType:
+    ruta = Path(__file__).resolve().parent / "lectura-a3.py"
+    nombre = f"_tas_lectura_a3_{abs(hash(str(ruta)))}"
+    existente = sys.modules.get(nombre)
+    if existente is not None:
+        return existente
+    spec = importlib.util.spec_from_file_location(nombre, ruta)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"No se pudo cargar {ruta}")
+    modulo = importlib.util.module_from_spec(spec)
+    sys.modules[nombre] = modulo
+    spec.loader.exec_module(modulo)
+    return modulo
 
 NOMBRES = {
     1: "Contexto y Desperdicio (Muda) Observado",
@@ -105,6 +124,18 @@ def _validar_entrada_contrato(ruta: Path, ver: str, c: object) -> None:
             _fallar_contrato_json(ruta, f"'{clave_txt}' en 'reglas' debe ser texto no vacío o null")
     if reglas.get("sin_medir_hasta") is not None and reglas["sin_medir_hasta"] not in c["etapas"]:
         _fallar_contrato_json(ruta, "'sin_medir_hasta' debe ser una etapa válida del contrato")
+    topes = c.get("topes")
+    if topes is not None:
+        if not isinstance(topes, dict) or any(
+            k not in topes
+            or not isinstance(topes[k], int)
+            or isinstance(topes[k], bool)
+            or topes[k] <= 0
+            for k in ("celda", "vineta", "total")
+        ):
+            _fallar_contrato_json(
+                ruta, "'topes' debe ser un objeto con enteros positivos celda, vineta y total"
+            )
 
 
 def _leer_datos_contrato_json() -> dict:
@@ -171,6 +202,17 @@ MARCADOR_CORCHETE = re.compile(
 CAMPO = re.compile(r"^\s*[-*]\s*\*\*(.*?):\*\*\s*(.*)$")
 ETIQUETA_CONTRATO_EXACTA = re.compile(r"^- \*\*Contrato:\*\*(?: (.*))?$")
 BRECHA = re.compile(r"^\s*[-*]\s*\*\*Brecha:\*\*")
+CUERPO_BRECHA = re.compile(r"de\s+.+?\(medido\)\s+a\s+.+?\(meta\)\s+para\s+\S", re.IGNORECASE)
+CUERPO_BRECHA_PARTES = re.compile(
+    r"^de\s+(?P<actual>.+?)\s*\(medido\)\s+a\s+(?P<meta>.+?)\s*\(meta\)\s+para\s+\S",
+    re.IGNORECASE,
+)
+CUERPO_BRECHA_RESPALDO = re.compile(
+    r"^de\s+(?P<actual>.+?)(?:\s*\(medido\))?\s+a\s+(?P<meta>.+?)(?:\s*\(meta\))?(?:\s+para\s+\S.*)?$",
+    re.IGNORECASE,
+)
+MARCADOR_MUESTRA_BRECHA = re.compile(r"(?<!\w)<(?:indicador|actual|meta|cu[aá]ndo)>(?!\w)", re.IGNORECASE)
+FORMA_BRECHA_INDICADOR = "<indicador>: de <actual> (medido) a <meta> (meta) para <cuándo>"
 CAUSA = re.compile(r"^\s*[-*]\s*\*\*\s*Causa\b([^*]*?):\*\*\s*(.*)$", re.IGNORECASE)
 PORQUE = re.compile(r"^\s*[-*]\s*\d+[a-z]?[.)]\s*\S")
 POR_LO_TANTO = re.compile(r"^\s*[-*]\s*(?:\*\*)?\s*por lo tanto\s*:?\s*(?:\*\*)?\s*(.*)$", re.IGNORECASE)
@@ -336,6 +378,10 @@ SUBTITULO_H3 = re.compile(r"^\s*###(?!#)\s*(.+?)\s*$")
 TITULO_MD = re.compile(r"^\s*#{1,6}(?!#)(?:\s|$)")
 MAPA_ESTADO_H3 = re.compile(r"^Mapa\s+del\s+estado\s+(presente|futuro)\b", re.IGNORECASE)
 MARCA_SIN_MEDIR = re.compile(r"^\[\s*sin\s+medir\s*\]$", re.IGNORECASE)
+ESTALLIDO_INICIO = re.compile(r"^\[([A-Z])\]")
+ESTALLIDO_EN_CELDA = re.compile(r"\[([A-Z])\]")
+PALABRA_TOPE = re.compile(r"[^\W_]+", re.UNICODE)
+VINETA_TOPE = re.compile(r"^\s*[-*+]\s+(.*)$")
 TITULO_MAPA_PRESENTE = "### Mapa del estado presente"
 TITULO_MAPA_FUTURO = "### Mapa del estado futuro"
 TABLA_MAPA_ENCABEZADO = ("Paso", "Quién", "Tiempo", "Problema", "Fuente")
@@ -1917,7 +1963,7 @@ def validar_a3(
             informe.error(err_c)
         for aviso in avisos_titulos:
             informe.aviso(aviso)
-        validar_cabecera(doc, campos, informe)
+        validar_cabecera(doc, campos, informe, contrato=contrato)
         no_vacias = sum(1 for linea in doc.lineas if linea.strip())
         if no_vacias > MAX_LINEAS:
             informe.error(f"el A3 tiene {no_vacias} líneas no vacías y el máximo es {MAX_LINEAS} (una página); sintetiza")
@@ -1936,7 +1982,7 @@ def validar_a3(
     for aviso in avisos_titulos:
         informe.aviso(aviso)
 
-    validar_cabecera(doc, campos, informe)
+    validar_cabecera(doc, campos, informe, contrato=contrato)
     no_vacias = sum(1 for linea in doc.lineas if linea.strip())
     if no_vacias > MAX_LINEAS:
         informe.error(f"el A3 tiene {no_vacias} líneas no vacías y el máximo es {MAX_LINEAS} (una página); sintetiza")
@@ -2005,6 +2051,8 @@ def validar_a3(
     if 5 in completas:
         validar_seccion_5(completas[5], causas, informe, contrato)
         validar_mapas_seccion(completas[5], efectiva, informe, contrato, bases_fuentes, ruta_a3_path)
+    if es_contrato_3:
+        validar_estallidos_kaizen(completas, efectiva, causas, informe, contrato)
     irreversible = validar_seccion_6(completas[6], informe) if 6 in completas else False
     if 6 in completas:
         validar_mapas_seccion(completas[6], efectiva, informe, contrato, bases_fuentes, ruta_a3_path)
@@ -2014,6 +2062,8 @@ def validar_a3(
     validar_coach(campos, efectiva, irreversible, informe)
     # El bloque Siguientes pasos depende de la etapa del documento (su cabecera), no de la pedida.
     validar_siguientes_pasos(doc, etapa_cabecera or efectiva, informe)
+    if contrato.get("topes"):
+        validar_topes_palabras(doc, completas, informe, contrato)
     return informe
 
 
@@ -2047,7 +2097,25 @@ def leer_etapa(
     return etapa_cabecera
 
 
-def validar_cabecera(doc: Documento, campos: dict[str, tuple[str, str]], informe: Informe) -> None:
+def _marcadores_angulares_titulo_c3(titulo: str) -> list[str]:
+    limpia = sin_codigo(titulo)
+    hallados: list[str] = []
+    for m in ANGULAR.finditer(limpia):
+        interior = m.group(1)
+        if interior and not interior[0].isspace() and not interior[-1].isspace():
+            token = m.group(0)
+            if token not in hallados:
+                hallados.append(token)
+    return hallados
+
+
+def validar_cabecera(
+    doc: Documento,
+    campos: dict[str, tuple[str, str]],
+    informe: Informe,
+    contrato: dict | None = None,
+) -> None:
+    es_contrato_3 = bool(contrato and contrato["reglas"].get("fuente_mapa") == "cuatro_formas")
     titulo = next((linea for linea in doc.cabecera if re.match(r"#(?!#)", linea)), None)
     if titulo is None:
         informe.error("Cabecera: falta el título '# A3: ...' que nombra el problema")
@@ -2056,6 +2124,10 @@ def validar_cabecera(doc: Documento, campos: dict[str, tuple[str, str]], informe
         if not re.match(r"A3\s*:", texto):
             informe.aviso("Cabecera: el título debería empezar con '# A3:'")
         hallados = marcadores([titulo])
+        if es_contrato_3:
+            for extra in _marcadores_angulares_titulo_c3(titulo):
+                if extra not in hallados:
+                    hallados.append(extra)
         for marcador in hallados:
             informe.error(f"Cabecera: Contiene placeholder sin completar: '{marcador}'")
         if not hallados and not re.sub(r"^A3\s*:\s*", "", texto).strip():
@@ -2172,16 +2244,141 @@ def validar_seccion_2(
         informe.error("sección 2: ningún hecho tiene fuente; cada dato medido dice de dónde sale")
 
     if linea_brecha is None:
-        informe.error("sección 2: falta la línea '- **Brecha:** de X (medido) a Y (meta) para <cuándo>'")
+        forma_falta = (
+            FORMA_BRECHA_INDICADOR
+            if es_contrato_3
+            else "de X (medido) a Y (meta) para <cuándo>"
+        )
+        informe.error(f"sección 2: falta la línea '- **Brecha:** {forma_falta}'")
         return
     valor = valor_de_campo(linea_brecha)
-    if not valor or marcadores([valor]) or not tiene_texto_real(valor):
+    es_muestra_brecha = bool(es_contrato_3 and MARCADOR_MUESTRA_BRECHA.search(sin_codigo(valor)))
+    if not valor or marcadores([valor]) or es_muestra_brecha or not tiene_texto_real(valor):
         informe.error("sección 2: la línea Brecha está vacía o sin completar; di de cuánto a cuánto y para cuándo")
         return
-    if not re.match(r"de\s+.+?\(medido\)\s+a\s+.+?\(meta\)\s+para\s+\S", valor, re.IGNORECASE):
+    indicador_brecha, cuerpo_brecha, cuerpo_brecha_ok = _analizar_brecha(valor)
+    if es_contrato_3:
+        if not indicador_brecha:
+            informe.error(
+                f"sección 2: la Brecha no nombra su indicador; usa '- **Brecha:** {FORMA_BRECHA_INDICADOR}'"
+            )
+        else:
+            partes_brecha = _extraer_actual_y_meta_brecha(cuerpo_brecha)
+            if partes_brecha is None:
+                informe.error(f"sección 2: la Brecha debería tener la forma '{FORMA_BRECHA_INDICADOR}'")
+            else:
+                if not cuerpo_brecha_ok:
+                    informe.aviso(f"sección 2: la Brecha debería tener la forma '{FORMA_BRECHA_INDICADOR}'")
+                _validar_titulo_con_brecha_c3(
+                    doc, indicador_brecha, partes_brecha[0], partes_brecha[1], informe
+                )
+    elif not cuerpo_brecha_ok:
         informe.aviso("sección 2: la Brecha debería tener la forma 'de X (medido) a Y (meta) para <cuándo>'")
-    if not re.search(r"\d", valor):
+    if not re.search(r"\d", cuerpo_brecha):
         informe.aviso("sección 2: la Brecha no tiene ninguna cifra; sin número no se sabe si se cerró")
+
+
+def _extraer_actual_y_meta_brecha(cuerpo_brecha: str) -> tuple[str, str] | None:
+    """Extrae (actual, meta) del cuerpo 'de <actual> (medido) a <meta> (meta) para <cuándo>'."""
+    partes = _lectura_a3().extraer_partes_cuerpo_brecha(cuerpo_brecha)
+    if partes is None:
+        return None
+    return (partes[0], partes[1])
+
+
+def _normalizar_para_brecha(texto: str) -> str:
+    """Minúsculas, sin tildes y sin puntuación, con espacios simples."""
+    descompuesto = unicodedata.normalize("NFKD", texto)
+    sin_tildes = "".join(c for c in descompuesto if not unicodedata.combining(c)).lower()
+    return re.sub(r"[\W_]+", " ", sin_tildes, flags=re.UNICODE).strip()
+
+
+def _contiene_parte_brecha(titulo_norm: str, parte: str) -> bool:
+    parte_norm = _normalizar_para_brecha(parte)
+    if not parte_norm:
+        return False
+    return f" {parte_norm} " in f" {titulo_norm} "
+
+
+def _texto_titulo_a3(cabecera: list[str]) -> str:
+    cerca: tuple[str, int] | None = None
+    for linea in cabecera:
+        ignorar, cerca = _avanzar_cerca_gfm(linea, cerca)
+        if ignorar:
+            continue
+        if re.match(r"#(?!#)", linea):
+            texto = re.sub(r"^#\s*", "", linea).strip()
+            return re.sub(r"^A3\s*:\s*", "", texto, flags=re.IGNORECASE).strip()
+    return ""
+
+
+def _coincide_valor_brecha_titulo(en_titulo: str, en_brecha: str, sufijo: str) -> bool:
+    lectura = _lectura_a3()
+    if sufijo == "meta":
+        return lectura.coincide_meta_en_titulo(en_titulo, en_brecha)
+    return lectura.coincide_valor_texto_brecha(en_titulo, en_brecha, sufijo)
+
+
+def _coincide_par_brecha_titulo(
+    x_txt: str, y_txt: str, actual_brecha: str, meta_brecha: str
+) -> bool:
+    lectura = _lectura_a3()
+    return lectura.coincide_valor_texto_brecha(
+        x_txt, actual_brecha, "medido"
+    ) and lectura.coincide_meta_en_titulo(y_txt, meta_brecha)
+
+
+def _validar_titulo_con_brecha_c3(
+    doc: Documento,
+    indicador_brecha: str,
+    actual_brecha: str,
+    meta_brecha: str,
+    informe: Informe,
+) -> None:
+    titulo_crudo = _texto_titulo_a3(doc.cabecera)
+    if _marcadores_angulares_titulo_c3(titulo_crudo) or marcadores([titulo_crudo]):
+        return
+    titulo_norm = _normalizar_para_brecha(titulo_crudo)
+    if not _contiene_parte_brecha(titulo_norm, indicador_brecha):
+        informe.error(
+            "Cabecera: el título tiene que nombrar la brecha:"
+            f" # A3: {indicador_brecha}: de {actual_brecha} a {meta_brecha}"
+        )
+        return
+
+    pares_xy = _lectura_a3().extraer_de_x_a_y_titulo(titulo_crudo, indicador_brecha)
+    if pares_xy:
+        if any(
+            _coincide_par_brecha_titulo(x_txt, y_txt, actual_brecha, meta_brecha)
+            for x_txt, y_txt in pares_xy
+        ):
+            return
+        elegido = next(
+            (
+                (x_txt, y_txt)
+                for x_txt, y_txt in pares_xy
+                if _coincide_valor_brecha_titulo(y_txt, meta_brecha, "meta")
+                or _coincide_valor_brecha_titulo(x_txt, actual_brecha, "medido")
+            ),
+            pares_xy[0],
+        )
+        informe.error(
+            f"Cabecera: el título dice de {elegido[0]} a {elegido[1]}"
+            f" y la Brecha dice de {actual_brecha} a {meta_brecha}"
+        )
+        return
+
+    if not _contiene_parte_brecha(titulo_norm, meta_brecha):
+        informe.error(
+            "Cabecera: el título tiene que nombrar la brecha:"
+            f" # A3: {indicador_brecha}: de {actual_brecha} a {meta_brecha}"
+        )
+
+
+def _analizar_brecha(valor: str) -> tuple[str, str, bool]:
+    """Separa opcionalmente '<indicador>:' del cuerpo 'de <actual> (medido) a <meta> (meta) para <cuándo>'."""
+    leida = _lectura_a3().leer_brecha(valor)
+    return (leida.indicador, leida.cuerpo, leida.cuerpo_canonico)
 
 
 def validar_mapas_seccion(
@@ -2283,6 +2480,208 @@ def validar_mapas_seccion(
                             " '(base: de dónde sale)'. Formas válidas: ruta:línea; `comando` -> ruta;"
                             " https://...; evidencia: ruta; o (base: de dónde sale)."
                         )
+
+
+def validar_estallidos_kaizen(
+    completas: dict[int, Seccion],
+    efectiva: str,
+    causas: list[Causa],
+    informe: Informe,
+    contrato: dict | None = None,
+) -> None:
+    """Enlaza estallidos [X] del mapa presente con las causas de 4b y avisa si quedan en el futuro."""
+    contrato_act = contrato or cargar_contrato(1)
+    if contrato_act["reglas"].get("fuente_mapa") != "cuatro_formas":
+        return
+    etapas = contrato_act["etapas"]
+    if efectiva not in etapas or "analizar" not in etapas:
+        return
+    en_o_tras_analizar = etapas.index(efectiva) >= etapas.index("analizar")
+
+    sec_2 = completas.get(2)
+    if sec_2 is not None:
+        letras_causas = {c.letra for c in causas if c.letra}
+        marcadas: set[str] = set()
+        hay_mapa_presente = False
+        for _, _, sub, tabla in _bloques_tabla_con_subtitulo(sec_2.cuerpo, contrato_3=True):
+            if _tipo_mapa_para_bloque(sub, tabla, 2, contrato_3=True) != "presente":
+                continue
+            if tuple(tabla.encabezado) != TABLA_MAPA_ENCABEZADO or not tabla.filas:
+                continue
+            hay_mapa_presente = True
+            i_paso = _indice_columna_paso(tabla)
+            i_paso = 0 if i_paso is None else i_paso
+            i_prob = columna(tabla, "Problema")
+            i_prob = 3 if i_prob is None else i_prob
+            for fila in tabla.filas:
+                paso = celda(fila, i_paso) or "(sin texto)"
+                problema = celda(fila, i_prob).strip()
+                est = _lectura_a3().leer_estallido(problema)
+                if est.estado == "invalido":
+                    if not marcadores([problema]):
+                        informe.error(
+                            f"sección 2: en el paso '{paso}', el estallido va así: [A],"
+                            " con la letra de una causa de la sección 4b"
+                        )
+                    continue
+                if est.estado != "canonico" or est.letra is None:
+                    continue
+                if not en_o_tras_analizar or 4 not in completas:
+                    continue
+                letra_est = est.letra
+                marcadas.add(letra_est)
+                if letra_est not in letras_causas:
+                    informe.error(
+                        f"sección 2: el estallido [{letra_est}] del paso '{paso}'"
+                        " no corresponde a ninguna causa de la sección 4"
+                    )
+        if en_o_tras_analizar and 4 in completas and hay_mapa_presente:
+            for causa in causas:
+                if causa.letra and causa.letra not in marcadas:
+                    informe.aviso(
+                        f"sección 4: la causa {causa.letra} no está marcada en el mapa presente:"
+                        " ¿en qué paso sucede?"
+                    )
+
+    if not en_o_tras_analizar:
+        return
+
+    sec_5 = completas.get(5)
+    if sec_5 is not None:
+        for _, _, sub, tabla in _bloques_tabla_con_subtitulo(sec_5.cuerpo, contrato_3=True):
+            if _tipo_mapa_para_bloque(sub, tabla, 5, contrato_3=True) != "futuro":
+                continue
+            if tuple(tabla.encabezado) != TABLA_MAPA_ENCABEZADO or not tabla.filas:
+                continue
+            i_paso = _indice_columna_paso(tabla)
+            i_paso = 0 if i_paso is None else i_paso
+            i_prob = columna(tabla, "Problema")
+            i_prob = 3 if i_prob is None else i_prob
+            for fila in tabla.filas:
+                paso = celda(fila, i_paso) or "(sin texto)"
+                problema = celda(fila, i_prob)
+                for letra_fut in _lectura_a3().estallidos_en_texto(sin_codigo(problema)):
+                    informe.aviso(
+                        "sección 5: en el mapa futuro los estallidos ya están resueltos;"
+                        f" quita [{letra_fut}] del paso '{paso}'"
+                    )
+
+
+def _contar_palabras_tope(texto: str) -> int:
+    return len(PALABRA_TOPE.findall(texto))
+
+
+def _comienzo_texto_tope(texto: str, max_palabras: int = 6) -> str:
+    limpio = re.sub(r"\s+", " ", texto).strip()
+    if not limpio:
+        return "(sin texto)"
+    partes = limpio.split(" ")
+    if len(partes) <= max_palabras:
+        return limpio
+    return " ".join(partes[:max_palabras]) + "..."
+
+
+def _lineas_sin_cerca_gfm(lineas: list[str]) -> list[str]:
+    fuera: list[str] = []
+    cerca: tuple[str, int] | None = None
+    for linea in lineas:
+        ignorar, cerca = _avanzar_cerca_gfm(linea, cerca)
+        if not ignorar:
+            fuera.append(linea)
+    return fuera
+
+
+def _vinetas_fuera_cerca(lineas_sin_cerca: list[str]) -> list[str]:
+    vinetas: list[str] = []
+    actual: list[str] = []
+    for linea in lineas_sin_cerca:
+        m_v = VINETA_TOPE.match(linea)
+        if m_v is not None:
+            if actual:
+                vinetas.append(" ".join(actual))
+            actual = [m_v.group(1).strip()]
+        elif (
+            actual
+            and linea.strip()
+            and linea[0].isspace()
+            and not TITULO_MD.match(linea)
+            and not linea.lstrip().startswith("|")
+        ):
+            actual.append(linea.strip())
+        else:
+            if actual:
+                vinetas.append(" ".join(actual))
+                actual = []
+    if actual:
+        vinetas.append(" ".join(actual))
+    return vinetas
+
+
+def validar_topes_palabras(
+    doc: Documento,
+    completas: dict[int, Seccion],
+    informe: Informe,
+    contrato: dict,
+) -> None:
+    """Avisa, sin parar la línea, si una celda, viñeta o el A3 supera los topes de palabras."""
+    topes = contrato.get("topes")
+    if not isinstance(topes, dict):
+        return
+    tope_celda = topes["celda"]
+    tope_vineta = topes["vineta"]
+    tope_total = topes["total"]
+
+    zonas: list[tuple[str, list[str]]] = [("Cabecera", doc.cabecera)]
+    for num in sorted(completas):
+        zonas.append((f"sección {num}", completas[num].cuerpo))
+    for extra in doc.extras:
+        if extra.tiene_contenido():
+            zonas.append((f"sección '{extra.titulo}'", extra.cuerpo))
+
+    total_palabras = 0
+    zona_mayor = "Cabecera"
+    palabras_mayor = -1
+    inicio_mayor = "(sin texto)"
+    inicio_doc = "(sin texto)"
+
+    for nombre_zona, lineas in zonas:
+        sin_cerca = _lineas_sin_cerca_gfm(lineas)
+        primera_no_vacia = next((ln.strip() for ln in sin_cerca if ln.strip()), "")
+        if inicio_doc == "(sin texto)" and primera_no_vacia:
+            inicio_doc = _comienzo_texto_tope(primera_no_vacia)
+
+        palabras_zona = sum(_contar_palabras_tope(ln) for ln in sin_cerca)
+        total_palabras += palabras_zona
+        if palabras_zona > palabras_mayor:
+            palabras_mayor = palabras_zona
+            zona_mayor = nombre_zona
+            inicio_mayor = (
+                _comienzo_texto_tope(primera_no_vacia) if primera_no_vacia else "(sin texto)"
+            )
+
+        for tabla in tablas(lineas, contrato_3=True):
+            for fila in tabla.filas:
+                for texto_celda in fila:
+                    n_celda = _contar_palabras_tope(texto_celda)
+                    if n_celda > tope_celda:
+                        informe.aviso(
+                            f"{nombre_zona}: la celda '{_comienzo_texto_tope(texto_celda)}'"
+                            f" tiene {n_celda} palabras (tope: {tope_celda})"
+                        )
+
+        for texto_vineta in _vinetas_fuera_cerca(sin_cerca):
+            n_vineta = _contar_palabras_tope(texto_vineta)
+            if n_vineta > tope_vineta:
+                informe.aviso(
+                    f"{nombre_zona}: la viñeta '{_comienzo_texto_tope(texto_vineta)}'"
+                    f" tiene {n_vineta} palabras (tope: {tope_vineta})"
+                )
+
+    if total_palabras > tope_total:
+        informe.aviso(
+            f"{zona_mayor}: el A3 ('{inicio_doc}') suma {total_palabras} palabras en total"
+            f" (tope: {tope_total}; mayor carga en {zona_mayor}: '{inicio_mayor}')"
+        )
 
 
 def validar_seccion_4(

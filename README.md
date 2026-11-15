@@ -111,7 +111,7 @@ tas/
 
 ## Instalación
 
-Manual de uso, de la instalación a un caso completo: [`docs/manual.md`](./docs/manual.md). Cambios de la versión 2.1.0 y migración: [`CHANGELOG.md`](./CHANGELOG.md).
+Manual de uso, de la instalación a un caso completo: [`docs/manual.md`](./docs/manual.md). Cambios de la versión 2.2.0 y migración: [`CHANGELOG.md`](./CHANGELOG.md).
 
 El repositorio público es `thinking-agent-system` (`https://github.com/mackrophages/thinking-agent-system`). En los bloques siguientes, `<ruta-a-tas>` es la carpeta donde clonaste o copiaste este repositorio.
 
@@ -172,7 +172,7 @@ for s in a3 5-porques agent-ops gemba goldfish-observer kaizen ojos-frescos; do
   sed -i "s/^name: $s\$/name: tas-$s/" "$DEST_OC/skills/tas-$s/SKILL.md"
 done
 {
-  printf '<!-- TAS v2.1.0: reglas siempre activas, copia de rules/AGENTS.md del plugin -->\n\n'
+  printf '<!-- TAS v2.2.0: reglas siempre activas, copia de rules/AGENTS.md del plugin -->\n\n'
   cat "$REPO/rules/AGENTS.md"
 } > "$DEST_OC/AGENTS.md"
 python3 - "$DEST_OC" <<'PY'

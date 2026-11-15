@@ -1,4 +1,4 @@
-# A3: 3 de cada 10 respaldos nocturnos de la base de datos no se pueden restaurar
+# A3: respaldos sin restaurar: de 3 de 10 a 0 de 10
 
 - **Propietario:** agente de infraestructura
 - **Coach / Revisor:** responsable de operaciones
@@ -20,15 +20,15 @@
 | El trabajo de respaldo terminó con salida 0 las 10 noches | `journalctl -u respaldo` -> ejemplo-respaldo.log |
 | La base pasó de 6 GB a 11 GB desde junio | `du -sh /var/lib/datos` -> ejemplo-respaldo.log |
 
-- **Brecha:** de 3 de 10 respaldos sin restaurar (medido) a 0 de 10 (meta) para el 2026-11-30
+- **Brecha:** respaldos sin restaurar: de 3 de 10 (medido) a 0 de 10 (meta) para el 2026-11-30
 
 ### Mapa del estado presente
 
 | Paso | Quién | Tiempo | Problema | Fuente |
 | :--- | :--- | :--- | :--- | :--- |
-| 1. Volcar la base | `respaldo.sh` desde el programador | 25 a 35 min | `timeout 30m` corta los volcados largos | ejemplo-respaldo.log:2 |
+| 1. Volcar la base | `respaldo.sh` desde el programador | 25 a 35 min | [A] `timeout 30m` corta los volcados largos | ejemplo-respaldo.log:2 |
 | 2. Comprimir | gzip en la misma tubería | lo que dure el volcado | termina bien aunque la entrada llegue cortada | ejemplo-respaldo.log:5 |
-| 3. Copiar al almacén | `rclone` | 4 min | copia el archivo cortado como si fuera bueno | ejemplo-respaldo.log:6 |
+| 3. Copiar al almacén | `rclone` | 4 min | [B] copia el archivo cortado como si fuera bueno | ejemplo-respaldo.log:6 |
 | 4. Revisar | ningún componente | no ocurre | el fallo solo se ve al restaurar | ejemplo-respaldo.log:7 |
 
 ## 3. Meta y Criterio de Aceptación

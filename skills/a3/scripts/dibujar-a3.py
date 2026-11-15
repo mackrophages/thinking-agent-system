@@ -7,7 +7,9 @@ pagina HTML de un solo archivo con diagramas SVG en linea.
 
 from __future__ import annotations
 
+import functools
 import html
+import importlib.util
 import itertools
 import json
 import math
@@ -17,6 +19,23 @@ import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import ModuleType
+
+
+@functools.lru_cache(maxsize=1)
+def _lectura_a3() -> ModuleType:
+    ruta = Path(__file__).resolve().parent / "lectura-a3.py"
+    nombre = f"_tas_lectura_a3_{abs(hash(str(ruta)))}"
+    existente = sys.modules.get(nombre)
+    if existente is not None:
+        return existente
+    spec = importlib.util.spec_from_file_location(nombre, ruta)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"No se pudo cargar {ruta}")
+    modulo = importlib.util.module_from_spec(spec)
+    sys.modules[nombre] = modulo
+    spec.loader.exec_module(modulo)
+    return modulo
 
 SECTION_SPECS: tuple[tuple[int, str, str, str], ...] = (
     (1, r"^##\s+1\.\s+Contexto\b.*$", "1. Contexto y Desperdicio (Muda) Observado", "comprender"),
@@ -162,6 +181,7 @@ PLACEHOLDER_PATTERNS_CI: tuple[str, ...] = (
     r"\[T[ií]tulo claro",
     r"<t[ií]tulo que nombra",
     r"<quien responde",
+    r"<(?:indicador|actual|meta|cu[aá]ndo)>",
 )
 
 PLACEHOLDER_PATTERNS_CS: tuple[str, ...] = (
@@ -224,6 +244,8 @@ class StateMapStep:
     problem: str
     has_problem: bool
     source: str = ""
+    burst: str | None = None
+    problem_text: str = ""
 
 
 @dataclass
@@ -285,66 +307,79 @@ ETAPAS_ANCHO = 660
 
 CSS_STYLES = """
 :root {
-  --color-primary: #faff69;
-  --color-primary-active: #e6eb52;
-  --color-primary-disabled: #3a3a1f;
-  --color-ink: #ffffff;
-  --color-body: #cccccc;
-  --color-body-strong: #e6e6e6;
-  --color-muted: #888888;
-  --color-muted-soft: #5a5a5a;
-  --color-hairline: #2a2a2a;
-  --color-hairline-strong: #3a3a3a;
-  --color-canvas: #0a0a0a;
-  --color-surface-soft: #121212;
-  --color-surface-card: #1a1a1a;
-  --color-surface-elevated: #242424;
-  --color-surface-yellow-band: #faff69;
-  --color-on-primary: #0a0a0a;
+  --fondo: #ffffff;
+  --fondo-suave: #f8f9fa;
+  --texto: #202124;
+  --sec: #5f6368;
+  --borde: #dadce0;
+  --ok: #137333;
+  --ok-suave: #e6f4ea;
+  --aviso: #b06000;
+  --aviso-suave: #fef7e0;
+  --error: #c5221f;
+  --error-suave: #fce8e6;
+  --info: #1a73e8;
+  --info-suave: #e8f0fe;
+  --color-primary: #1a73e8;
+  --color-primary-active: #1557b0;
+  --color-primary-disabled: #aecbfa;
+  --color-ink: #202124;
+  --color-body: #202124;
+  --color-body-strong: #202124;
+  --color-muted: #5f6368;
+  --color-muted-soft: #80868b;
+  --color-hairline: #e8eaed;
+  --color-hairline-strong: #dadce0;
+  --color-canvas: #ffffff;
+  --color-surface-soft: #f8f9fa;
+  --color-surface-card: #ffffff;
+  --color-surface-elevated: #f1f3f4;
+  --color-surface-yellow-band: #fef7e0;
+  --color-on-primary: #ffffff;
   --color-on-dark: #ffffff;
-  --color-on-yellow: #0a0a0a;
-  --color-accent-emerald: #22c55e;
-  --color-accent-rose: #ef4444;
-  --color-accent-blue: #3b82f6;
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
+  --color-on-yellow: #202124;
+  --color-accent-emerald: #137333;
+  --color-accent-rose: #c5221f;
+  --color-accent-blue: #1a73e8;
+  --color-success: #137333;
+  --color-warning: #b06000;
+  --color-error: #c5221f;
   --font-primary: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'DejaVu Sans', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'DejaVu Sans Mono', monospace;
-  --type-display-sm-size: 32px;
+  --type-display-sm-size: 24px;
   --type-display-sm-lh: 1.2;
-  --type-display-sm-ls: -1px;
-  --type-title-lg-size: 24px;
-  --type-title-lg-lh: 1.3;
-  --type-title-lg-ls: -0.3px;
-  --type-title-md-size: 18px;
-  --type-title-md-lh: 1.4;
-  --type-title-sm-size: 16px;
-  --type-title-sm-lh: 1.4;
-  --type-body-md-size: 16px;
-  --type-body-md-lh: 1.55;
-  --type-body-sm-size: 14px;
-  --type-body-sm-lh: 1.55;
-  --type-caption-size: 13px;
-  --type-caption-lh: 1.4;
-  --type-caption-up-size: 12px;
-  --type-caption-up-lh: 1.4;
-  --type-caption-up-ls: 1.5px;
-  --type-code-size: 14px;
-  --type-code-lh: 1.55;
-  --spacing-xxs: 4px;
-  --spacing-xs: 8px;
-  --spacing-sm: 12px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --spacing-xxl: 48px;
+  --type-display-sm-ls: -0.4px;
+  --type-title-lg-size: 17px;
+  --type-title-lg-lh: 1.2;
+  --type-title-lg-ls: -0.2px;
+  --type-title-md-size: 14.5px;
+  --type-title-md-lh: 1.3;
+  --type-title-sm-size: 13px;
+  --type-title-sm-lh: 1.3;
+  --type-body-md-size: 12px;
+  --type-body-md-lh: 1.28;
+  --type-body-sm-size: 11.5px;
+  --type-body-sm-lh: 1.28;
+  --type-caption-size: 10.5px;
+  --type-caption-lh: 1.24;
+  --type-caption-up-size: 10.5px;
+  --type-caption-up-lh: 1.25;
+  --type-caption-up-ls: 0.6px;
+  --type-code-size: 11.5px;
+  --type-code-lh: 1.32;
+  --spacing-xxs: 2px;
+  --spacing-xs: 5px;
+  --spacing-sm: 7px;
+  --spacing-md: 10px;
+  --spacing-lg: 12px;
+  --spacing-xl: 16px;
+  --spacing-xxl: 24px;
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-lg: 10px;
   --radius-pill: 9999px;
-  --layout-max-width: 1200px;
+  --layout-max-width: 1240px;
 }
 *, *::before, *::after {
   box-sizing: border-box;
@@ -352,8 +387,8 @@ CSS_STYLES = """
 html, body {
   margin: 0;
   padding: 0;
-  background-color: var(--color-canvas);
-  color: var(--color-body);
+  background-color: var(--fondo);
+  color: var(--texto);
   font-family: var(--font-primary);
   font-size: var(--type-body-sm-size);
   line-height: var(--type-body-sm-lh);
@@ -362,19 +397,19 @@ html, body {
 .a3-page {
   max-width: var(--layout-max-width);
   margin: 0 auto;
-  padding: var(--spacing-md);
+  padding: 5px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: 5px;
 }
 .a3-header {
-  background-color: var(--color-surface-card);
-  border: 1px solid var(--color-hairline-strong);
+  background-color: var(--fondo);
+  border: 1px solid var(--borde);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
+  padding: 6px 9px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: 4px;
 }
 .a3-header-top {
   display: flex;
@@ -388,51 +423,52 @@ html, body {
   line-height: var(--type-caption-up-lh);
   letter-spacing: var(--type-caption-up-ls);
   text-transform: uppercase;
-  color: var(--color-primary);
+  color: var(--sec);
   font-weight: 700;
 }
 .badge-pill {
   display: inline-flex;
   align-items: center;
   border-radius: var(--radius-pill);
-  padding: var(--spacing-xxs) var(--spacing-sm);
+  padding: 2px 9px;
   font-size: var(--type-caption-up-size);
   line-height: var(--type-caption-up-lh);
-  letter-spacing: var(--type-caption-up-ls);
+  letter-spacing: 0.4px;
   text-transform: uppercase;
   font-weight: 700;
 }
 .badge-yellow {
-  background-color: var(--color-primary);
-  color: var(--color-on-primary);
+  background-color: var(--ok-suave);
+  color: var(--ok);
+  border: 1px solid #a8dab5;
 }
 .badge-dark {
   background-color: var(--color-surface-elevated);
-  color: var(--color-body-strong);
-  border: 1px solid var(--color-hairline-strong);
-  letter-spacing: 0.4px;
+  color: var(--texto);
+  border: 1px solid var(--borde);
+  letter-spacing: 0.2px;
   text-transform: none;
   font-size: var(--type-caption-size);
   font-weight: 500;
 }
 .badge-success {
-  background-color: var(--color-surface-soft);
-  color: var(--color-success);
-  border: 1px solid var(--color-success);
+  background-color: var(--ok-suave);
+  color: var(--ok);
+  border: 1px solid #a8dab5;
 }
 .badge-warning {
-  background-color: var(--color-surface-soft);
-  color: var(--color-warning);
-  border: 1px solid var(--color-warning);
+  background-color: var(--aviso-suave);
+  color: var(--aviso);
+  border: 1px solid #f6c478;
 }
 .badge-muted {
-  background-color: var(--color-surface-soft);
-  color: var(--color-muted);
-  border: 1px solid var(--color-hairline-strong);
+  background-color: var(--color-surface-elevated);
+  color: var(--sec);
+  border: 1px solid var(--borde);
 }
 .a3-title {
   margin: 0;
-  color: var(--color-ink);
+  color: var(--texto);
   font-size: var(--type-title-lg-size);
   line-height: var(--type-title-lg-lh);
   letter-spacing: var(--type-title-lg-ls);
@@ -440,62 +476,66 @@ html, body {
   overflow-wrap: anywhere;
 }
 .meta-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: var(--spacing-xs);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
 }
 .meta-item {
-  background-color: var(--color-surface-soft);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-xs) var(--spacing-sm);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  background-color: var(--fondo-suave);
+  border: 1px solid var(--borde);
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
   min-width: 0;
+  max-width: 100%;
 }
 .meta-label {
-  display: block;
-  font-size: var(--type-caption-up-size);
-  line-height: var(--type-caption-up-lh);
-  letter-spacing: var(--type-caption-up-ls);
-  text-transform: uppercase;
-  color: var(--color-muted);
-  margin-bottom: 2px;
+  font-size: 11px;
+  color: var(--sec);
+  font-weight: 600;
+}
+.meta-label::after {
+  content: ":";
 }
 .meta-value {
-  color: var(--color-ink);
-  font-size: var(--type-body-sm-size);
+  color: var(--texto);
+  font-size: 12px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 .objective-banner {
-  background-color: var(--color-surface-soft);
-  border-left: 3px solid var(--color-primary);
-  border-radius: var(--radius-sm);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  color: var(--color-body-strong);
+  background-color: var(--fondo-suave);
+  border-left: 3px solid var(--ok);
+  border-radius: var(--radius-xs);
+  padding: 4px 8px;
+  color: var(--texto);
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 .stage-bar-wrap {
-  background-color: var(--color-surface-soft);
-  border: 1px solid var(--color-hairline);
+  background-color: var(--fondo-suave);
+  border: 1px solid var(--borde);
   border-radius: var(--radius-md);
-  padding: var(--spacing-xs) var(--spacing-sm);
+  padding: 4px 6px;
 }
 .a3-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
   align-items: start;
 }
 .a3-col {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
   min-width: 0;
 }
-@media (min-width: 960px) {
+@media (min-width: 900px) {
   .a3-page {
-    padding: var(--spacing-lg);
-    gap: var(--spacing-lg);
+    padding: var(--spacing-md);
+    gap: var(--spacing-md);
   }
   .a3-title {
     font-size: var(--type-display-sm-size);
@@ -504,77 +544,208 @@ html, body {
   }
   .a3-columns {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--spacing-lg);
+    gap: var(--spacing-md);
   }
 }
 .section-card {
-  background-color: var(--color-surface-card);
-  border: 1px solid var(--color-hairline);
+  background-color: var(--fondo);
+  border: 1px solid var(--borde);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: 3px;
   min-width: 0;
 }
 .section-card-pending {
-  background-color: var(--color-surface-soft);
+  background-color: var(--fondo-suave);
   border-style: dashed;
-  border-color: var(--color-hairline-strong);
+  border-color: var(--borde);
 }
 .section-card-next {
-  border-color: var(--color-primary-disabled);
-  background-color: var(--color-surface-card);
+  border-color: var(--info);
+  background-color: var(--fondo);
 }
 .section-title {
   margin: 0;
-  color: var(--color-ink);
+  color: var(--texto);
   font-size: var(--type-title-md-size);
   line-height: var(--type-title-md-lh);
   font-weight: 700;
-  padding-bottom: var(--spacing-xs);
+  padding-bottom: 4px;
   border-bottom: 1px solid var(--color-hairline);
 }
 .subsection-title {
-  margin: var(--spacing-xs) 0 0 0;
-  color: var(--color-body-strong);
+  margin: 4px 0 0 0;
+  color: var(--texto);
   font-size: var(--type-title-sm-size);
   line-height: var(--type-title-sm-lh);
-  font-weight: 600;
+  font-weight: 700;
+}
+.brecha-bloque {
+  border: 1px solid var(--borde);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  background-color: var(--fondo-suave);
+}
+.brecha-titulo {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sec);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.brecha-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  align-items: center;
+  margin: 2px 0 4px;
+}
+.brecha-fila-lbl {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sec);
+  font-weight: 700;
+}
+.cuadros-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.cuad {
+  display: inline-block;
+  width: 34px;
+  height: 22px;
+  border-radius: 5px;
+  flex: 0 0 auto;
+}
+.cuad.compacto {
+  width: 20px;
+  height: 17px;
+  border-radius: 4px;
+}
+.cuad.mini {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+}
+.cuad.lleno {
+  background-color: var(--ok);
+}
+.cuad.neutro {
+  background-color: var(--fondo);
+  border: 1.5px solid var(--borde);
+}
+.cuad.base {
+  background-color: #9aa0a6;
+}
+.cuad.brecha {
+  background-color: var(--error-suave);
+  border: 2px dashed var(--error);
+}
+.cuad.brecha-sobra {
+  background-color: var(--error);
+}
+.brecha-val {
+  font-size: 12px;
+  font-weight: 700;
+  margin-left: 4px;
+  overflow-wrap: anywhere;
+}
+.brecha-barras {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+  margin: 2px 0 4px;
+}
+.barra-pista {
+  width: 100%;
+  height: 13px;
+  background-color: #e8eaed;
+  border-radius: 9999px;
+  overflow: hidden;
+  display: flex;
+}
+.barra-ok {
+  height: 100%;
+  background-color: var(--ok);
+}
+.barra-base {
+  height: 100%;
+  background-color: #9aa0a6;
+}
+.barra-brecha {
+  height: 100%;
+  background-color: var(--error);
+}
+.barra-brecha.barra-falta {
+  background-color: var(--error-suave);
+  border: 1.5px dashed var(--error);
+}
+.brecha-gap {
+  font-size: 12px;
+  color: var(--error);
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 .brecha-callout {
-  background-color: var(--color-surface-soft);
-  border: 1px solid var(--color-primary);
+  background-color: var(--aviso-suave);
+  border: 1px solid #f6c478;
   border-radius: var(--radius-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  color: var(--color-ink);
+  padding: 8px 10px;
+  color: var(--texto);
 }
 .brecha-label {
   display: block;
-  font-size: var(--type-caption-up-size);
-  letter-spacing: var(--type-caption-up-ls);
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-primary);
+  color: var(--aviso);
   font-weight: 700;
-  margin-bottom: var(--spacing-xxs);
+  margin-bottom: 2px;
 }
 .brecha-text {
-  font-size: var(--type-body-md-size);
-  line-height: var(--type-body-md-lh);
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-lh);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+.leyenda-estallidos {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--sec);
+}
+.leyenda-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.mini-estallido {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
 .pending-notice {
   margin: 0;
-  color: var(--color-muted);
+  color: var(--sec);
   font-size: var(--type-body-sm-size);
   font-style: italic;
 }
 .diagram-box {
-  background-color: var(--color-surface-soft);
-  border: 1px solid var(--color-hairline-strong);
+  background-color: var(--fondo-suave);
+  border: 1px solid var(--borde);
   border-radius: var(--radius-md);
-  padding: var(--spacing-xs);
+  padding: 4px;
   width: 100%;
   overflow: hidden;
 }
@@ -586,81 +757,165 @@ svg {
 }
 p {
   margin: 0;
-  color: var(--color-body);
+  color: var(--texto);
   overflow-wrap: anywhere;
 }
 ul, ol {
   margin: 0;
-  padding-left: var(--spacing-lg);
+  padding-left: 18px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xxs);
+  gap: 2px;
 }
 li {
-  color: var(--color-body);
+  color: var(--texto);
   overflow-wrap: anywhere;
 }
 li > ul, li > ol {
-  margin-top: var(--spacing-xxs);
+  margin-top: 2px;
 }
 strong {
-  color: var(--color-ink);
-  font-weight: 600;
+  color: var(--texto);
+  font-weight: 700;
 }
 code {
   font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: var(--type-code-size);
+  line-height: var(--type-code-lh);
   background-color: var(--color-surface-elevated);
-  color: var(--color-primary);
-  padding: 1px 5px;
+  color: var(--texto);
+  border: 1px solid var(--color-hairline);
+  padding: 0 4px;
   border-radius: var(--radius-xs);
   overflow-wrap: break-word;
   word-break: normal;
 }
+.cadenas-4b {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cadena-bloque {
+  border-left: 3px solid var(--aviso);
+  background-color: var(--fondo-suave);
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cadena {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--texto);
+  overflow-wrap: anywhere;
+}
+.cadena-conclusion {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sec);
+  overflow-wrap: anywhere;
+}
 .por-lo-tanto {
-  color: var(--color-primary);
-  font-weight: 600;
+  color: var(--ok);
+  font-weight: 700;
 }
 .no-apply-note {
-  background-color: var(--color-surface-soft);
-  border: 1px solid var(--color-hairline-strong);
+  background-color: var(--fondo-suave);
+  border: 1px solid var(--borde);
   border-radius: var(--radius-md);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  color: var(--color-body-strong);
+  padding: 5px 8px;
+  color: var(--texto);
+  font-size: 12px;
+}
+details.mapa-detalles {
+  border: 1px solid var(--borde);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  background-color: var(--fondo-suave);
+  font-size: 12px;
+}
+details.mapa-detalles > summary {
+  cursor: pointer;
+  color: var(--sec);
+  font-weight: 600;
+}
+details.mapa-detalles[open] > summary {
+  margin-bottom: 6px;
+}
+.notas {
+  background-color: var(--fondo-suave);
+  border: 1px solid var(--borde);
+  border-radius: var(--radius-lg);
+  padding: 6px 10px;
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--sec);
+}
+.notas-titulo {
+  margin: 0 0 3px 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sec);
+  font-weight: 700;
+}
+.notas ol {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.notas li {
+  color: var(--sec);
+}
+a.nota-ref {
+  color: var(--info);
+  text-decoration: none;
+  font-weight: 700;
+  margin-left: 2px;
 }
 .table-wrap {
   width: 100%;
-  overflow-x: auto;
-  border: 1px solid var(--color-hairline-strong);
+  overflow-x: visible;
+  border: 1px solid var(--borde);
   border-radius: var(--radius-md);
-  background-color: var(--color-surface-soft);
+  background-color: var(--fondo);
 }
 table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--type-caption-size);
   line-height: var(--type-caption-lh);
+  table-layout: auto;
 }
 th, td {
-  padding: 8px 10px;
+  padding: 3px 4px;
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--color-hairline);
   overflow-wrap: break-word;
+  word-break: normal;
 }
 td code, th code {
   overflow-wrap: anywhere;
 }
+td .badge-pill {
+  white-space: nowrap;
+  font-size: 9.5px;
+  padding: 1px 6px;
+}
 th {
   background-color: var(--color-surface-elevated);
-  color: var(--color-ink);
-  font-size: 11px;
-  line-height: 1.3;
-  letter-spacing: 0.7px;
+  color: var(--texto);
+  font-size: 9.5px;
+  line-height: 1.2;
+  letter-spacing: 0.2px;
   text-transform: uppercase;
   font-weight: 700;
   white-space: normal;
+  overflow-wrap: normal;
 }
 tr:last-child td {
   border-bottom: none;
@@ -677,10 +932,10 @@ tr:last-child td {
 }
 .table-pick tr {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 12px;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-bottom: 1px solid var(--color-hairline-strong);
+  grid-template-columns: 0.9fr 1fr 1.25fr;
+  gap: 1px 5px;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--borde);
 }
 .table-pick tr:last-child {
   border-bottom: none;
@@ -696,77 +951,77 @@ tr:last-child td {
   grid-column: 1 / -1;
 }
 .table-pick td:first-child {
-  color: var(--color-ink);
-  font-weight: 600;
-  padding-bottom: 6px;
+  color: var(--texto);
+  font-weight: 700;
+  padding-bottom: 2px;
   border-bottom: 1px solid var(--color-hairline);
 }
 .table-pick td:last-child {
-  padding-top: 6px;
+  padding-top: 2px;
   border-top: 1px dashed var(--color-hairline);
 }
 .table-pick td::before {
-  content: attr(data-label);
-  display: block;
-  font-size: 10px;
-  line-height: 1.3;
-  letter-spacing: 0.8px;
+  content: attr(data-label) ": ";
+  display: inline;
+  font-size: 9.5px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--sec);
   font-weight: 700;
-  margin-bottom: 2px;
+}
+.table-pick td:first-child::before {
+  content: "";
 }
 @media (max-width: 680px) {
   .a3-page {
-    padding: var(--spacing-sm);
-    gap: var(--spacing-sm);
+    padding: 6px;
+    gap: 6px;
   }
   .a3-header, .section-card {
-    padding: var(--spacing-md);
+    padding: 7px 9px;
+    gap: 4px;
   }
   .diagram-box {
-    padding: 6px;
+    padding: 3px;
   }
   .table-wrap {
     overflow-x: visible;
   }
-  .table-wrap table, .table-wrap tbody {
+  .table-wrap table.cols-many, .table-wrap table.cols-many tbody {
     display: block;
     width: 100%;
   }
-  .table-wrap thead {
+  .table-wrap table.cols-many thead {
     display: none;
   }
-  .table-wrap:not(.table-pick) tr {
+  .table-wrap:not(.table-pick) table.cols-many tr {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--color-hairline-strong);
+    gap: 2px;
+    padding: 5px 7px;
+    border-bottom: 1px solid var(--borde);
   }
-  .table-wrap:not(.table-pick) tr:last-child {
+  .table-wrap:not(.table-pick) table.cols-many tr:last-child {
     border-bottom: none;
   }
-  .table-wrap:not(.table-pick) td {
+  .table-wrap:not(.table-pick) table.cols-many td {
     display: block;
     padding: 0;
     border-bottom: none;
     min-width: 0;
   }
-  .table-wrap:not(.table-pick) td:first-child {
-    color: var(--color-ink);
+  .table-wrap:not(.table-pick) table.cols-many td:first-child {
+    color: var(--texto);
     font-weight: 600;
   }
-  .table-wrap:not(.table-pick) td::before {
-    content: attr(data-label);
-    display: block;
-    font-size: 10px;
-    line-height: 1.3;
-    letter-spacing: 0.8px;
+  .table-wrap:not(.table-pick) table.cols-many td::before {
+    content: attr(data-label) ": ";
+    display: inline;
+    font-size: 9.5px;
+    letter-spacing: 0.3px;
     text-transform: uppercase;
-    color: var(--color-muted);
+    color: var(--sec);
     font-weight: 700;
-    margin-bottom: 2px;
   }
 }
 """.strip()
@@ -1375,6 +1630,13 @@ def parse_state_map_table(
                 f"El nombre del paso en la fila {idx + 1} de 'Mapa del estado {kind}' está vacío."
             )
         has_prob = not is_no_problem(prob_txt)
+        burst: str | None = None
+        prob_clean = prob_txt
+        if has_prob and kind == "presente":
+            est = _lectura_a3().leer_estallido(prob_txt)
+            if est.estado == "canonico" and est.letra is not None:
+                burst = est.letra
+                prob_clean = est.texto_limpio
         steps.append(
             StateMapStep(
                 step=step_txt,
@@ -1383,6 +1645,8 @@ def parse_state_map_table(
                 problem=prob_txt,
                 has_problem=has_prob,
                 source=source_txt,
+                burst=burst,
+                problem_text=prob_clean,
             )
         )
     return steps
@@ -1636,9 +1900,9 @@ def _draw_stages_narrow(
         stages_order = _construir_orden_etapas(cargar_contrato(1))
     stage_index = {key: idx for idx, (key, _, _) in enumerate(stages_order)}
     current_idx = stage_index[current_stage]
-    row_h = 34
-    gap = 4
-    pad_y = 6
+    row_h = 24
+    gap = 2
+    pad_y = 4
     view_h = pad_y * 2 + len(stages_order) * row_h + (len(stages_order) - 1) * gap
     parts: list[str] = [
         svg_open(
@@ -1653,40 +1917,40 @@ def _draw_stages_narrow(
     for idx in range(len(stages_order) - 1):
         cy1 = pad_y + idx * (row_h + gap) + row_h / 2
         cy2 = cy1 + row_h + gap
-        line_color = "#22c55e" if idx < current_idx else "#3a3a3a"
+        line_color = "#137333" if idx < current_idx else "#dadce0"
         parts.append(
-            f'<line x1="22" y1="{fmt(cy1)}" x2="22" y2="{fmt(cy2)}" '
+            f'<line x1="20" y1="{fmt(cy1)}" x2="20" y2="{fmt(cy2)}" '
             f'stroke="{line_color}" stroke-width="2"/>'
         )
 
     for idx, (stage_key, stage_label, _) in enumerate(stages_order):
         ry = pad_y + idx * (row_h + gap)
         cy = ry + row_h / 2
-        ty = ry + 21.5
+        ty = ry + 16.0
         estado, title_txt, sub_txt = _stage_visual_state(idx, current_idx, stage_label)
         parts.append(f'<g data-etapa="{esc(stage_key)}" data-etapa-estado="{estado}">')
         if estado == "actual":
             parts.append(
-                f'<rect x="6" y="{fmt(ry)}" width="308" height="{row_h}" rx="8" '
-                f'fill="#faff69" stroke="#faff69" stroke-width="1.5"/>'
-                f'<circle cx="22" cy="{fmt(cy)}" r="5" fill="#0a0a0a"/>'
-                + svg_text(36, ty, title_txt, 13, "#0a0a0a", weight=700)
-                + svg_text(302, ty, sub_txt, 12, "#0a0a0a", weight=600, anchor="end")
+                f'<rect x="6" y="{fmt(ry)}" width="308" height="{row_h}" rx="6" '
+                f'fill="#e8f0fe" stroke="#1a73e8" stroke-width="1.5"/>'
+                f'<circle cx="20" cy="{fmt(cy)}" r="4.5" fill="#1a73e8"/>'
+                + svg_text(33, ty, title_txt, 12.5, "#202124", weight=700)
+                + svg_text(304, ty, sub_txt, 12.0, "#1a73e8", weight=700, anchor="end")
             )
         elif estado == "completada":
             parts.append(
-                f'<circle cx="22" cy="{fmt(cy)}" r="5.5" fill="#121212" '
-                f'stroke="#22c55e" stroke-width="2"/>'
-                f'<circle cx="22" cy="{fmt(cy)}" r="2.2" fill="#22c55e"/>'
-                + svg_text(36, ty, title_txt, 13, "#22c55e", weight=700)
-                + svg_text(302, ty, sub_txt, 12, "#cccccc", weight=500, anchor="end")
+                f'<circle cx="20" cy="{fmt(cy)}" r="5" fill="#e6f4ea" '
+                f'stroke="#137333" stroke-width="1.8"/>'
+                f'<circle cx="20" cy="{fmt(cy)}" r="2" fill="#137333"/>'
+                + svg_text(33, ty, title_txt, 12.5, "#137333", weight=700)
+                + svg_text(304, ty, sub_txt, 12.0, "#5f6368", weight=500, anchor="end")
             )
         else:
             parts.append(
-                f'<circle cx="22" cy="{fmt(cy)}" r="5" fill="#121212" '
-                f'stroke="#5a5a5a" stroke-width="1.5"/>'
-                + svg_text(36, ty, title_txt, 13, "#888888", weight=600)
-                + svg_text(302, ty, sub_txt, 12, "#6e6e6e", weight=500, anchor="end")
+                f'<circle cx="20" cy="{fmt(cy)}" r="4.5" fill="#ffffff" '
+                f'stroke="#9aa0a6" stroke-width="1.5"/>'
+                + svg_text(33, ty, title_txt, 12.5, "#5f6368", weight=600)
+                + svg_text(304, ty, sub_txt, 12.0, "#80868b", weight=500, anchor="end")
             )
         parts.append("</g>")
 
@@ -1702,12 +1966,12 @@ def _draw_stages_wide(
         stages_order = _construir_orden_etapas(cargar_contrato(1))
     stage_index = {key: idx for idx, (key, _, _) in enumerate(stages_order)}
     current_idx = stage_index[current_stage]
-    view_h = 68
+    view_h = 56
     step_w = 124
-    step_h = 52
+    step_h = 44
     gap = 7
     start_x = 6
-    y = 8
+    y = 6
 
     parts: list[str] = [
         svg_open(
@@ -1723,7 +1987,7 @@ def _draw_stages_wide(
         x1 = start_x + idx * (step_w + gap) + step_w
         x2 = x1 + gap
         cy = y + step_h // 2
-        line_color = "#22c55e" if idx < current_idx else "#3a3a3a"
+        line_color = "#137333" if idx < current_idx else "#dadce0"
         parts.append(
             f'<line x1="{x1}" y1="{cy}" x2="{x2}" y2="{cy}" '
             f'stroke="{line_color}" stroke-width="2"/>'
@@ -1734,21 +1998,21 @@ def _draw_stages_wide(
         cx = x + step_w / 2
         estado, title_txt, sub_txt = _stage_visual_state(idx, current_idx, stage_label)
         if estado == "completada":
-            bg, border, border_w = "#121212", "#22c55e", "1.5"
-            title_fill, sub_fill = "#22c55e", "#cccccc"
+            bg, border, border_w = "#e6f4ea", "#137333", "1.5"
+            title_fill, sub_fill = "#137333", "#5f6368"
         elif estado == "actual":
-            bg, border, border_w = "#faff69", "#faff69", "2"
-            title_fill, sub_fill = "#0a0a0a", "#0a0a0a"
+            bg, border, border_w = "#e8f0fe", "#1a73e8", "2"
+            title_fill, sub_fill = "#202124", "#1a73e8"
         else:
-            bg, border, border_w = "#121212", "#2a2a2a", "1"
-            title_fill, sub_fill = "#888888", "#6e6e6e"
+            bg, border, border_w = "#ffffff", "#dadce0", "1"
+            title_fill, sub_fill = "#5f6368", "#80868b"
 
         parts.append(
             f'<g data-etapa="{esc(stage_key)}" data-etapa-estado="{estado}">'
             f'<rect x="{x}" y="{y}" width="{step_w}" height="{step_h}" rx="8" '
             f'fill="{bg}" stroke="{border}" stroke-width="{border_w}"/>'
-            + svg_text(cx, y + 21, title_txt, 12, title_fill, weight=700, anchor="middle")
-            + svg_text(cx, y + 40, sub_txt, 11, sub_fill, weight=500, anchor="middle")
+            + svg_text(cx, y + 18, title_txt, 12, title_fill, weight=700, anchor="middle")
+            + svg_text(cx, y + 34, sub_txt, 11, sub_fill, weight=500, anchor="middle")
             + "</g>"
         )
 
@@ -1771,9 +2035,9 @@ def _prepare_ishikawa_branch(
     branch: IshikawaBranch, card_w: int, pill_h: int, hyp_size: float, hyp_lh: float
 ) -> tuple[list[str], int, int]:
     """Calcula renglones envueltos, alto de tarjeta de hipotesis y alto total del bloque."""
-    wrapped = wrap_text(branch.hypothesis, card_w - 20, hyp_size, bold=False)
-    card_h = max(34, math.ceil(18.0 + (len(wrapped) - 1) * hyp_lh + 11.0))
-    total_h = pill_h + 5 + card_h
+    wrapped = wrap_text(branch.hypothesis, card_w - 12, hyp_size, bold=False)
+    card_h = max(22, math.ceil(13.5 + (len(wrapped) - 1) * hyp_lh + 5.0))
+    total_h = pill_h + 2 + card_h
     return wrapped, card_h, total_h
 
 
@@ -1789,38 +2053,64 @@ def _draw_ishikawa_branch_group(
     join_y_offset: float,
     lienzo: Lienzo,
     hyp_lh: float,
+    hyp_size: float,
 ) -> tuple[str, float]:
     """Dibuja una rama del Ishikawa con su pastilla, tarjeta de hipotesis y espina diagonal."""
     is_foco = branch.state == "FOCO"
-    group_opacity = "1" if is_foco else "0.75"
-    bone_stroke = "#faff69" if is_foco else "#5a5a5a"
-    bone_width = "2.5" if is_foco else "1.5"
+    group_opacity = "1" if is_foco else "0.88"
+    bone_stroke = "#b06000" if is_foco else "#9aa0a6"
+    bone_width = "2.0" if is_foco else "1.2"
     bone_dash = "" if is_foco else ' stroke-dasharray="4 3"'
 
-    pill_bg = "#faff69" if is_foco else "#121212"
-    pill_border = "#faff69" if is_foco else "#3a3a3a"
-    pill_text = "#0a0a0a" if is_foco else "#cccccc"
-    pill_sub = "#0a0a0a" if is_foco else "#888888"
+    pill_bg = "#fef7e0" if is_foco else "#f1f3f4"
+    pill_border = "#b06000" if is_foco else "#dadce0"
+    pill_text = "#202124" if is_foco else "#5f6368"
+    pill_sub = "#b06000" if is_foco else "#80868b"
 
-    card_bg = "#1a1a1a" if is_foco else "#121212"
-    card_border = "#faff69" if is_foco else "#2a2a2a"
-    card_border_op = "0.75" if is_foco else "1"
-    hyp_fill = "#ffffff" if is_foco else "#a8a8a8"
+    card_bg = "#ffffff" if is_foco else "#f8f9fa"
+    card_border = "#b06000" if is_foco else "#dadce0"
+    card_border_op = "0.9" if is_foco else "1"
+    hyp_fill = "#202124" if is_foco else "#5f6368"
 
-    name_size = 12.5 if lienzo.ancha else 13.0
-    state_size = lienzo.etiqueta
-    hyp_size = lienzo.cuerpo
+    name_size = 12.0
+    state_size = 11.0 if lienzo.ancha else 12.0
 
-    card_y = by + pill_h + 5
+    card_y = by + pill_h + 2
     edge_x = bx + card_w if bx < spine_x else bx
     y1 = by + pill_h / 2.0
     y_twig = card_y + card_h / 2.0
-    y2 = y_twig + 9.0 + join_y_offset
+    y2 = y_twig + 6.0 + join_y_offset
     t_ratio = (y_twig - y1) / (y2 - y1)
     join_x = edge_x + t_ratio * (spine_x - edge_x)
 
-    pill_ty = by + (17.5 if lienzo.ancha else 19.0)
-    hyp_ty = card_y + (17.0 if lienzo.ancha else 18.0)
+    if lienzo.ancha:
+        pill_texts = (
+            svg_text(bx + 6, by + 14.5, branch.name, name_size, pill_text, weight=700)
+            + svg_text(
+                bx + card_w - 6,
+                by + 14.5,
+                branch.state,
+                state_size,
+                pill_sub,
+                weight=700,
+                anchor="end",
+                spacing=0.2,
+            )
+        )
+    else:
+        pill_texts = (
+            svg_text(bx + 6, by + 11.8, branch.name, name_size, pill_text, weight=700)
+            + svg_text(
+                bx + 6,
+                by + 23.8,
+                branch.state,
+                state_size,
+                pill_sub,
+                weight=700,
+                spacing=0.2,
+            )
+        )
+    hyp_ty = card_y + 14.0
 
     svg = (
         f'<g data-rama="{esc(branch.name)}" data-estado="{esc(branch.state)}" '
@@ -1828,140 +2118,112 @@ def _draw_ishikawa_branch_group(
         f'<line x1="{fmt(edge_x)}" y1="{fmt(y1)}" x2="{fmt(spine_x)}" y2="{fmt(y2)}" '
         f'stroke="{bone_stroke}" stroke-width="{bone_width}"{bone_dash}/>'
         f'<line x1="{fmt(edge_x)}" y1="{fmt(y_twig)}" x2="{fmt(join_x)}" y2="{fmt(y_twig)}" '
-        f'stroke="{bone_stroke}" stroke-width="1.5"/>'
-        f'<circle cx="{fmt(spine_x)}" cy="{fmt(y2)}" r="3.5" fill="{bone_stroke}"/>'
-        f'<g><rect x="{fmt(bx)}" y="{fmt(by)}" width="{card_w}" height="{pill_h}" rx="6" '
-        f'fill="{pill_bg}" stroke="{pill_border}" stroke-width="1.5"/>'
-        + svg_text(bx + 10, pill_ty, branch.name, name_size, pill_text, weight=700)
-        + svg_text(
-            bx + card_w - 10,
-            pill_ty,
-            branch.state,
-            state_size,
-            pill_sub,
-            weight=700,
-            anchor="end",
-            spacing=0.5,
-        )
+        f'stroke="{bone_stroke}" stroke-width="1.2"/>'
+        f'<circle cx="{fmt(spine_x)}" cy="{fmt(y2)}" r="3.0" fill="{bone_stroke}"/>'
+        f'<g><rect x="{fmt(bx)}" y="{fmt(by)}" width="{card_w}" height="{pill_h}" rx="5" '
+        f'fill="{pill_bg}" stroke="{pill_border}" stroke-width="1.2"/>'
+        + pill_texts
         + "</g>"
-        f'<g><rect x="{fmt(bx)}" y="{fmt(card_y)}" width="{card_w}" height="{card_h}" rx="6" '
+        f'<g><rect x="{fmt(bx)}" y="{fmt(card_y)}" width="{card_w}" height="{card_h}" rx="5" '
         f'fill="{card_bg}" stroke="{card_border}" stroke-opacity="{card_border_op}" '
-        f'stroke-width="1.2"/>'
-        + svg_text_lines(bx + 10, hyp_ty, wrapped, hyp_size, hyp_lh, hyp_fill)
+        f'stroke-width="1.1"/>'
+        + svg_text_lines(bx + 6, hyp_ty, wrapped, hyp_size, hyp_lh, hyp_fill)
         + "</g></g>"
     )
     return svg, y2
 
 
 def _draw_ishikawa(branches: list[IshikawaBranch], brecha: str, lienzo: Lienzo) -> str:
-    pill_h = 26 if lienzo.ancha else 28
-    hyp_lh = 15.5 if lienzo.ancha else 16.5
+    pill_h = 20 if lienzo.ancha else 27
+    hyp_size = 11.5 if lienzo.ancha else 12.0
+    hyp_lh = 14.0 if lienzo.ancha else 14.2
     branch_groups: list[str] = []
-    last_rib_y = 20.0
+    last_rib_y = 18.0
 
     if lienzo.ancha:
         spine_x = 240.0
         card_w = 208
         bx_left = 8.0
         bx_right = 264.0
-        cur_y = 8.0
-        row_vgap = 14.0
-        for r_idx in range(3):
-            b_left = branches[2 * r_idx]
-            b_right = branches[2 * r_idx + 1]
-            w_l, ch_l, th_l = _prepare_ishikawa_branch(b_left, card_w, pill_h, lienzo.cuerpo, hyp_lh)
-            w_r, ch_r, th_r = _prepare_ishikawa_branch(
-                b_right, card_w, pill_h, lienzo.cuerpo, hyp_lh
-            )
-            g_l, y2_l = _draw_ishikawa_branch_group(
-                b_left, bx_left, cur_y, card_w, pill_h, ch_l, w_l, spine_x, 0.0, lienzo, hyp_lh
-            )
-            g_r, y2_r = _draw_ishikawa_branch_group(
-                b_right, bx_right, cur_y, card_w, pill_h, ch_r, w_r, spine_x, 7.0, lienzo, hyp_lh
-            )
-            branch_groups.extend((g_l, g_r))
-            last_rib_y = max(last_rib_y, y2_l, y2_r)
-            cur_y += max(th_l, th_r) + row_vgap
-        branches_bottom = cur_y - row_vgap
-        brecha_y = max(branches_bottom, last_rib_y) + 22.0
+        cur_y = 6.0
+        row_vgap = 10.0
         head_x = 16
         head_w = 448
-        spine_svg = (
-            f'<line x1="{fmt(spine_x)}" y1="14" x2="{fmt(spine_x)}" y2="{fmt(brecha_y - 6)}" '
-            f'stroke="#e6e6e6" stroke-width="3"/>'
-            f'<polygon points="{fmt(spine_x)},{fmt(brecha_y)} '
-            f'{fmt(spine_x - 7)},{fmt(brecha_y - 10)} {fmt(spine_x + 7)},{fmt(brecha_y - 10)}" '
-            f'fill="#faff69"/>'
-        )
     else:
-        spine_x = 324.0
-        card_w = 292
-        bx = 8.0
-        cur_y = 8.0
-        branch_vgap = 12.0
-        for branch in branches:
-            wrapped, card_h, total_h = _prepare_ishikawa_branch(
-                branch, card_w, pill_h, lienzo.cuerpo, hyp_lh
-            )
-            g_svg, y2 = _draw_ishikawa_branch_group(
-                branch, bx, cur_y, card_w, pill_h, card_h, wrapped, spine_x, 0.0, lienzo, hyp_lh
-            )
-            branch_groups.append(g_svg)
-            last_rib_y = max(last_rib_y, y2)
-            cur_y += total_h + branch_vgap
-        branches_bottom = cur_y - branch_vgap
-        turn_y = max(branches_bottom, last_rib_y) + 12.0
-        brecha_y = turn_y + 18.0
-        head_x = 8
-        head_w = 324
-        center_x = lienzo.ancho / 2.0
-        spine_svg = (
-            f'<polyline points="{fmt(spine_x)},14 {fmt(spine_x)},{fmt(turn_y)} '
-            f'{fmt(center_x)},{fmt(turn_y)} {fmt(center_x)},{fmt(brecha_y - 6)}" '
-            f'fill="none" stroke="#e6e6e6" stroke-width="3" stroke-linejoin="round"/>'
-            f'<polygon points="{fmt(center_x)},{fmt(brecha_y)} '
-            f'{fmt(center_x - 7)},{fmt(brecha_y - 10)} {fmt(center_x + 7)},{fmt(brecha_y - 10)}" '
-            f'fill="#faff69"/>'
-        )
+        spine_x = 170.0
+        card_w = 152
+        bx_left = 4.0
+        bx_right = 184.0
+        cur_y = 5.0
+        row_vgap = 6.0
+        head_x = 6
+        head_w = 328
 
-    pad_bx = 12
-    brecha_lbl_size = max(11.5, lienzo.etiqueta)
-    brecha_body_size = lienzo.cuerpo
-    brecha_lh = 16.0 if lienzo.ancha else 16.5
+    for r_idx in range(3):
+        b_left = branches[2 * r_idx]
+        b_right = branches[2 * r_idx + 1]
+        w_l, ch_l, th_l = _prepare_ishikawa_branch(b_left, card_w, pill_h, hyp_size, hyp_lh)
+        w_r, ch_r, th_r = _prepare_ishikawa_branch(
+            b_right, card_w, pill_h, hyp_size, hyp_lh
+        )
+        g_l, y2_l = _draw_ishikawa_branch_group(
+            b_left, bx_left, cur_y, card_w, pill_h, ch_l, w_l, spine_x, 0.0, lienzo, hyp_lh, hyp_size
+        )
+        g_r, y2_r = _draw_ishikawa_branch_group(
+            b_right, bx_right, cur_y, card_w, pill_h, ch_r, w_r, spine_x, 5.0, lienzo, hyp_lh, hyp_size
+        )
+        branch_groups.extend((g_l, g_r))
+        last_rib_y = max(last_rib_y, y2_l, y2_r)
+        cur_y += max(th_l, th_r) + row_vgap
+
+    branches_bottom = cur_y - row_vgap
+    brecha_y = max(branches_bottom, last_rib_y) + 15.0
+    spine_svg = (
+        f'<line x1="{fmt(spine_x)}" y1="10" x2="{fmt(spine_x)}" y2="{fmt(brecha_y - 5)}" '
+        f'stroke="#5f6368" stroke-width="2.5"/>'
+        f'<polygon points="{fmt(spine_x)},{fmt(brecha_y)} '
+        f'{fmt(spine_x - 6)},{fmt(brecha_y - 8)} {fmt(spine_x + 6)},{fmt(brecha_y - 8)}" '
+        f'fill="#c5221f"/>'
+    )
+
+    pad_bx = 9
+    brecha_lbl_size = 11.5 if lienzo.ancha else 12.0
+    brecha_body_size = 11.5 if lienzo.ancha else 12.0
+    brecha_lh = 14.0
     brecha_lns = wrap_text(brecha, head_w - 2 * pad_bx, brecha_body_size, bold=True)
-    body_off = 45.0
-    brecha_h = math.ceil(body_off + (len(brecha_lns) - 1) * brecha_lh + 13.0)
+    body_off = 33.0
+    brecha_h = math.ceil(body_off + (len(brecha_lns) - 1) * brecha_lh + 7.0)
 
     brecha_svg = (
         f'<g data-elemento="brecha">'
-        f'<rect x="{head_x}" y="{fmt(brecha_y)}" width="{head_w}" height="{brecha_h}" rx="8" '
-        f'fill="#1a1a1a" stroke="#faff69" stroke-width="2"/>'
+        f'<rect x="{head_x}" y="{fmt(brecha_y)}" width="{head_w}" height="{brecha_h}" rx="7" '
+        f'fill="#fce8e6" stroke="#c5221f" stroke-width="1.8"/>'
         + svg_text(
             head_x + head_w / 2.0,
-            brecha_y + 20.0,
+            brecha_y + 16.5,
             "PROBLEMA · BRECHA",
             brecha_lbl_size,
-            "#faff69",
+            "#c5221f",
             weight=700,
             anchor="middle",
-            spacing=0.6,
+            spacing=0.5,
         )
-        + f'<line x1="{head_x + 10}" y1="{fmt(brecha_y + 28)}" '
-        f'x2="{head_x + head_w - 10}" y2="{fmt(brecha_y + 28)}" '
-        f'stroke="#3a3a3a" stroke-width="1"/>'
+        + f'<line x1="{head_x + 10}" y1="{fmt(brecha_y + 22)}" '
+        f'x2="{head_x + head_w - 10}" y2="{fmt(brecha_y + 22)}" '
+        f'stroke="#f5c2c0" stroke-width="1"/>'
         + svg_text_lines(
             head_x + pad_bx,
             brecha_y + body_off,
             brecha_lns,
             brecha_body_size,
             brecha_lh,
-            "#ffffff",
+            "#202124",
             weight=600,
         )
         + "</g>"
     )
 
-    view_h = brecha_y + brecha_h + 8.0
+    view_h = brecha_y + brecha_h + 6.0
     return (
         svg_open(
             "svg-ishikawa",
@@ -1990,28 +2252,28 @@ def _draw_pick_option(opt: PickOption, px: float, py: float, code_size: float, t
     )
     if opt.decision == "elegida":
         body = (
-            f'<circle cx="{fmt(px)}" cy="{fmt(py)}" r="11.5" fill="none" '
-            f'stroke="#faff69" stroke-opacity="0.45" stroke-width="1.5"/>'
-            f'<circle data-punto="pick" cx="{fmt(px)}" cy="{fmt(py)}" r="7.5" '
-            f'fill="#faff69" stroke="#0a0a0a" stroke-width="1.5"/>'
-            + svg_text(px + tx_off, py + 4.5, opt.code, code_size, "#faff69", weight=700)
+            f'<circle cx="{fmt(px)}" cy="{fmt(py)}" r="10.5" fill="none" '
+            f'stroke="#137333" stroke-opacity="0.35" stroke-width="1.5"/>'
+            f'<circle data-punto="pick" cx="{fmt(px)}" cy="{fmt(py)}" r="6.5" '
+            f'fill="#137333" stroke="#ffffff" stroke-width="1.5"/>'
+            + svg_text(px + tx_off, py + 4.0, opt.code, code_size, "#137333", weight=700)
         )
     elif opt.decision == "después":
         body = (
-            f'<circle data-punto="pick" cx="{fmt(px)}" cy="{fmt(py)}" r="7.5" '
-            f'fill="#1a1a1a" stroke="#f59e0b" stroke-width="2.4"/>'
-            f'<circle cx="{fmt(px)}" cy="{fmt(py)}" r="2.5" fill="#f59e0b"/>'
-            + svg_text(px + tx_off, py + 4.5, opt.code, code_size, "#e6e6e6", weight=600)
+            f'<circle data-punto="pick" cx="{fmt(px)}" cy="{fmt(py)}" r="6.5" '
+            f'fill="#ffffff" stroke="#b06000" stroke-width="2.2"/>'
+            f'<circle cx="{fmt(px)}" cy="{fmt(py)}" r="2.2" fill="#b06000"/>'
+            + svg_text(px + tx_off, py + 4.0, opt.code, code_size, "#b06000", weight=700)
         )
     else:
         body = (
-            f'<circle data-punto="pick" cx="{fmt(px)}" cy="{fmt(py)}" r="7" '
-            f'fill="#121212" stroke="#5a5a5a" stroke-width="1.5" stroke-dasharray="2 2"/>'
-            f'<line x1="{fmt(px - 3.2)}" y1="{fmt(py - 3.2)}" '
-            f'x2="{fmt(px + 3.2)}" y2="{fmt(py + 3.2)}" stroke="#888888" stroke-width="1.5"/>'
-            f'<line x1="{fmt(px - 3.2)}" y1="{fmt(py + 3.2)}" '
-            f'x2="{fmt(px + 3.2)}" y2="{fmt(py - 3.2)}" stroke="#888888" stroke-width="1.5"/>'
-            + svg_text(px + tx_off, py + 4.5, opt.code, code_size, "#9a9a9a", weight=500)
+            f'<circle data-punto="pick" cx="{fmt(px)}" cy="{fmt(py)}" r="6.5" '
+            f'fill="#ffffff" stroke="#9aa0a6" stroke-width="1.5" stroke-dasharray="2 2"/>'
+            f'<line x1="{fmt(px - 2.8)}" y1="{fmt(py - 2.8)}" '
+            f'x2="{fmt(px + 2.8)}" y2="{fmt(py + 2.8)}" stroke="#5f6368" stroke-width="1.5"/>'
+            f'<line x1="{fmt(px - 2.8)}" y1="{fmt(py + 2.8)}" '
+            f'x2="{fmt(px + 2.8)}" y2="{fmt(py - 2.8)}" stroke="#5f6368" stroke-width="1.5"/>'
+            + svg_text(px + tx_off, py + 4.0, opt.code, code_size, "#5f6368", weight=600)
         )
     return header + body + "</g>"
 
@@ -2034,7 +2296,7 @@ def _draw_pick(options: list[PickOption], lienzo: Lienzo) -> str:
         rot_title_x = 15
         col_step = 98
         pad_px = 22
-        tx_off = 15.0
+        tx_off = 14.0
         max_2col_w = 68.0
         leg_x = (64, 166, 276)
     else:
@@ -2045,33 +2307,33 @@ def _draw_pick(options: list[PickOption], lienzo: Lienzo) -> str:
         rot_title_x = 13
         col_step = 65
         pad_px = 20
-        tx_off = 14.0
+        tx_off = 13.0
         max_2col_w = 37.0
         leg_x = (52, 136, 226)
 
-    grid_y = 40
-    row_step = 36
-    qtitle_size = 13.5
+    grid_y = 26
+    row_step = 32
+    qtitle_size = 13.0
     qsub_size = lienzo.etiqueta
-    qsub_lh = 15.0
+    qsub_lh = 13.0
     code_size = lienzo.cuerpo
 
     quad_specs = (
-        (0, 0, "Implementar", "Impacto alto · Esfuerzo bajo", "#faff69", "#1d1e14"),
-        (1, 0, "Desafío", "Impacto alto · Esfuerzo alto", "#f59e0b", "#181818"),
-        (0, 1, "Posible", "Impacto bajo · Esfuerzo bajo", "#cccccc", "#121212"),
-        (1, 1, "Eliminar", "Impacto bajo · Esfuerzo alto", "#888888", "#121212"),
+        (0, 0, "Implementar", "Impacto alto · Esfuerzo bajo", "#137333", "#e6f4ea"),
+        (1, 0, "Desafío", "Impacto alto · Esfuerzo alto", "#b06000", "#fef7e0"),
+        (0, 1, "Posible", "Impacto bajo · Esfuerzo bajo", "#5f6368", "#f8f9fa"),
+        (1, 1, "Eliminar", "Impacto bajo · Esfuerzo alto", "#80868b", "#f1f3f4"),
     )
 
     quad_cols: dict[str, int] = {}
     quad_subs: dict[str, list[str]] = {}
     quad_first_off: dict[str, float] = {}
-    quad_h = 128
+    quad_h = 82
     for _, _, qname, qsub, _, _ in quad_specs:
-        sub_lns = wrap_text(qsub, quad_w - 20, qsub_size, bold=False)
+        sub_lns = wrap_text(qsub, quad_w - 18, qsub_size, bold=False)
         quad_subs[qname] = sub_lns
-        header_end = 37.0 + (len(sub_lns) - 1) * qsub_lh
-        first_off = header_end + 24.0
+        header_end = 31.0 + (len(sub_lns) - 1) * qsub_lh
+        first_off = header_end + 15.0
         quad_first_off[qname] = first_off
 
         opts_q = by_quad[qname]
@@ -2079,14 +2341,14 @@ def _draw_pick(options: list[PickOption], lienzo: Lienzo) -> str:
         cols_q = 2 if len(opts_q) >= 2 and widest <= max_2col_w else 1
         quad_cols[qname] = cols_q
         rows_q = max(1, (len(opts_q) + cols_q - 1) // cols_q)
-        needed_qh = math.ceil(first_off + (rows_q - 1) * row_step + 20.0)
+        needed_qh = math.ceil(first_off + (rows_q - 1) * row_step + 12.0)
         if needed_qh > quad_h:
             quad_h = needed_qh
 
     grid_w = quad_w * 2
     grid_h = quad_h * 2
-    axis_hy = grid_y + grid_h + 14
-    view_h = axis_hy + 46
+    axis_hy = grid_y + grid_h + 10
+    view_h = axis_hy + 35
 
     parts: list[str] = [
         svg_open("svg-pick", lienzo.ancho, view_h, lienzo.variante, "Matriz PICK de opciones")
@@ -2095,16 +2357,16 @@ def _draw_pick(options: list[PickOption], lienzo: Lienzo) -> str:
     lx1, lx2, lx3 = leg_x
     parts.append(
         '<g data-elemento="leyenda-pick">'
-        f'<circle cx="{lx1}" cy="18" r="8.5" fill="none" stroke="#faff69" stroke-opacity="0.45" stroke-width="1.5"/>'
-        f'<circle cx="{lx1}" cy="18" r="5.5" fill="#faff69"/>'
-        + svg_text(lx1 + 13, 22.5, "Elegida", 12, "#e6e6e6", weight=600)
-        + f'<circle cx="{lx2}" cy="18" r="6" fill="#1a1a1a" stroke="#f59e0b" stroke-width="2.2"/>'
-        f'<circle cx="{lx2}" cy="18" r="2" fill="#f59e0b"/>'
-        + svg_text(lx2 + 12, 22.5, "Después", 12, "#e6e6e6", weight=600)
-        + f'<circle cx="{lx3}" cy="18" r="5.5" fill="#121212" stroke="#5a5a5a" stroke-width="1.5" stroke-dasharray="2 2"/>'
-        f'<line x1="{lx3 - 2.8}" y1="15.2" x2="{lx3 + 2.8}" y2="20.8" stroke="#888888" stroke-width="1.5"/>'
-        f'<line x1="{lx3 - 2.8}" y1="20.8" x2="{lx3 + 2.8}" y2="15.2" stroke="#888888" stroke-width="1.5"/>'
-        + svg_text(lx3 + 12, 22.5, "Descartada", 12, "#888888", weight=600)
+        f'<circle cx="{lx1}" cy="15" r="8" fill="none" stroke="#137333" stroke-opacity="0.35" stroke-width="1.5"/>'
+        f'<circle cx="{lx1}" cy="15" r="5" fill="#137333"/>'
+        + svg_text(lx1 + 12, 19.0, "Elegida", 12, "#202124", weight=600)
+        + f'<circle cx="{lx2}" cy="15" r="5.5" fill="#ffffff" stroke="#b06000" stroke-width="2"/>'
+        f'<circle cx="{lx2}" cy="15" r="2" fill="#b06000"/>'
+        + svg_text(lx2 + 11, 19.0, "Después", 12, "#202124", weight=600)
+        + f'<circle cx="{lx3}" cy="15" r="5" fill="#ffffff" stroke="#9aa0a6" stroke-width="1.5" stroke-dasharray="2 2"/>'
+        f'<line x1="{lx3 - 2.6}" y1="12.4" x2="{lx3 + 2.6}" y2="17.6" stroke="#5f6368" stroke-width="1.5"/>'
+        f'<line x1="{lx3 - 2.6}" y1="17.6" x2="{lx3 + 2.6}" y2="12.4" stroke="#5f6368" stroke-width="1.5"/>'
+        + svg_text(lx3 + 11, 19.0, "Descartada", 12, "#5f6368", weight=600)
         + "</g>"
     )
 
@@ -2116,9 +2378,9 @@ def _draw_pick(options: list[PickOption], lienzo: Lienzo) -> str:
         parts.append(
             f'<g data-cuadrante-caja="{esc(qname)}">'
             f'<rect x="{qx}" y="{qy}" width="{quad_w}" height="{quad_h}" '
-            f'fill="{qfill}" stroke="#3a3a3a" stroke-width="1.5"/>'
-            + svg_text(qx + 10, qy + 21, qname, qtitle_size, qtitle_color, weight=700)
-            + svg_text_lines(qx + 10, qy + 37, sub_lns, qsub_size, qsub_lh, "#9a9a9a")
+            f'fill="{qfill}" stroke="#dadce0" stroke-width="1.5"/>'
+            + svg_text(qx + 8, qy + 18, qname, qtitle_size, qtitle_color, weight=700)
+            + svg_text_lines(qx + 8, qy + 33, sub_lns, qsub_size, qsub_lh, "#5f6368")
             + "</g>"
         )
         cols_q = quad_cols[qname]
@@ -2137,15 +2399,15 @@ def _draw_pick(options: list[PickOption], lienzo: Lienzo) -> str:
     ax_sub_size = lienzo.etiqueta
     parts.append(
         f'<line x1="{axis_vx}" y1="{grid_y + grid_h}" x2="{axis_vx}" y2="{grid_y + 6}" '
-        f'stroke="#888888" stroke-width="1.5"/>'
+        f'stroke="#5f6368" stroke-width="1.5"/>'
         f'<polygon points="{axis_vx},{grid_y} {axis_vx - 4},{grid_y + 9} {axis_vx + 4},{grid_y + 9}" '
-        f'fill="#888888"/>'
+        f'fill="#5f6368"/>'
         + svg_text(
             rot_sub_x,
             grid_y + quad_h / 2,
             "ALTO",
             ax_sub_size,
-            "#cccccc",
+            "#202124",
             weight=700,
             anchor="middle",
             spacing=1.0,
@@ -2156,7 +2418,7 @@ def _draw_pick(options: list[PickOption], lienzo: Lienzo) -> str:
             grid_y + quad_h + quad_h / 2,
             "BAJO",
             ax_sub_size,
-            "#888888",
+            "#5f6368",
             weight=700,
             anchor="middle",
             spacing=1.0,
@@ -2167,7 +2429,7 @@ def _draw_pick(options: list[PickOption], lienzo: Lienzo) -> str:
             grid_y + grid_h / 2,
             "IMPACTO",
             12,
-            "#ffffff",
+            "#202124",
             weight=700,
             anchor="middle",
             spacing=1.5,
@@ -2177,35 +2439,35 @@ def _draw_pick(options: list[PickOption], lienzo: Lienzo) -> str:
 
     parts.append(
         f'<line x1="{grid_x}" y1="{axis_hy}" x2="{grid_x + grid_w - 6}" y2="{axis_hy}" '
-        f'stroke="#888888" stroke-width="1.5"/>'
+        f'stroke="#5f6368" stroke-width="1.5"/>'
         f'<polygon points="{grid_x + grid_w},{axis_hy} {grid_x + grid_w - 9},{axis_hy - 4} '
-        f'{grid_x + grid_w - 9},{axis_hy + 4}" fill="#888888"/>'
+        f'{grid_x + grid_w - 9},{axis_hy + 4}" fill="#5f6368"/>'
         + svg_text(
             grid_x + quad_w / 2,
-            axis_hy + 17,
+            axis_hy + 15,
             "BAJO",
             ax_sub_size,
-            "#cccccc",
+            "#202124",
             weight=700,
             anchor="middle",
             spacing=1.0,
         )
         + svg_text(
             grid_x + quad_w + quad_w / 2,
-            axis_hy + 17,
+            axis_hy + 15,
             "ALTO",
             ax_sub_size,
-            "#888888",
+            "#5f6368",
             weight=700,
             anchor="middle",
             spacing=1.0,
         )
         + svg_text(
             grid_x + grid_w / 2,
-            axis_hy + 36,
+            axis_hy + 32,
             "ESFUERZO",
             12,
-            "#ffffff",
+            "#202124",
             weight=700,
             anchor="middle",
             spacing=1.5,
@@ -2221,58 +2483,58 @@ def render_pick_svg(options: list[PickOption]) -> str:
     return draw_variants("diagram-box", lambda lienzo: _draw_pick(options, lienzo))
 
 
+def _starburst_points(cx: float, cy: float, r_out: float, r_in: float, tips: int = 11) -> str:
+    """Genera los vertices de un estallido kaizen centrado en (cx, cy)."""
+    pts: list[str] = []
+    total = tips * 2
+    for i in range(total):
+        ang = -math.pi / 2 + i * (2 * math.pi / total)
+        r = r_out if i % 2 == 0 else r_in
+        pts.append(f"{fmt(cx + r * math.cos(ang))},{fmt(cy + r * math.sin(ang))}")
+    return " ".join(pts)
+
+
 def _draw_state_map(steps: list[StateMapStep], kind: str, lienzo: Lienzo) -> str:
     total = len(steps)
-    cols = min(2, max(1, total)) if lienzo.ancha else 1
     margin_x = 8
-    arrow_gap = 24
-    usable_w = lienzo.ancho - 2 * margin_x
-    box_w = (usable_w - (cols - 1) * arrow_gap) // cols
+    right_gutter = 56
+    box_w = lienzo.ancho - margin_x - right_gutter
     pad_x = 12
     text_max_w = box_w - 2 * pad_x
 
-    tag_size = lienzo.etiqueta
-    step_size = 13.0 if lienzo.ancha else 13.5
-    step_lh = 17.0 if lienzo.ancha else 18.0
-    meta_size = lienzo.cuerpo
-    meta_lh = 15.5 if lienzo.ancha else 16.5
-    prob_size = max(11.5, lienzo.etiqueta)
-    prob_lh = 15.0 if lienzo.ancha else 16.0
+    step_size = 12.5
+    step_lh = 15.0
+    meta_size = 12.0
+    meta_lh = 14.0
+    prob_size = 11.5 if lienzo.ancha else 12.0
+    prob_lh = 14.0
 
-    rows_data: list[
-        tuple[int, list[tuple[StateMapStep, list[str], list[str], list[str], float, float, float]]]
-    ] = []
-    for start in range(0, total, cols):
-        chunk = steps[start : start + cols]
-        prepared_chunk: list[
-            tuple[StateMapStep, list[str], list[str], list[str], float, float, float]
-        ] = []
-        row_h = 88
-        for st in chunk:
-            step_lns = wrap_text(st.step, text_max_w, step_size, bold=True)
-            meta_lns = wrap_text(f"{st.who} · {st.duration}", text_max_w, meta_size, bold=False)
-            prob_lns = (
-                wrap_text(st.problem, text_max_w, prob_size, bold=True) if st.has_problem else []
-            )
-            step_off = 45.0
-            step_end = step_off + (len(step_lns) - 1) * step_lh
-            meta_off = step_end + step_lh + 3.0
-            meta_end = meta_off + (len(meta_lns) - 1) * meta_lh
-            if st.has_problem and prob_lns:
-                sep_off = meta_end + 9.0
-                prob_off = sep_off + 16.0
-                prob_end = prob_off + (len(prob_lns) - 1) * prob_lh
-                needed_h = math.ceil(prob_end + 12.0)
-            else:
-                sep_off = 0.0
-                needed_h = math.ceil(meta_end + 12.0)
-            if needed_h > row_h:
-                row_h = needed_h
-            prepared_chunk.append((st, step_lns, meta_lns, prob_lns, step_off, meta_off, sep_off))
-        rows_data.append((row_h, prepared_chunk))
+    prepared: list[tuple[StateMapStep, list[str], list[str], list[str], float, float, float, int]] = []
+    for st in steps:
+        is_burst = kind == "presente" and st.burst is not None
+        show_inline_prob = st.has_problem and not is_burst
+        step_lns = wrap_text(st.step, text_max_w, step_size, bold=True)
+        meta_lns = wrap_text(f"{st.who} · {st.duration}", text_max_w, meta_size, bold=False)
+        prob_lns = (
+            wrap_text(st.problem_text or st.problem, text_max_w, prob_size, bold=True)
+            if show_inline_prob
+            else []
+        )
+        step_off = 17.5
+        step_end = step_off + (len(step_lns) - 1) * step_lh
+        meta_off = step_end + step_lh + 1.0
+        meta_end = meta_off + (len(meta_lns) - 1) * meta_lh
+        if show_inline_prob and prob_lns:
+            prob_off = meta_end + meta_lh + 1.0
+            prob_end = prob_off + (len(prob_lns) - 1) * prob_lh
+            box_h = max(46, math.ceil(prob_end + 8.0))
+        else:
+            prob_off = 0.0
+            box_h = max(44, math.ceil(meta_end + 8.0))
+        prepared.append((st, step_lns, meta_lns, prob_lns, step_off, meta_off, prob_off, box_h))
 
-    row_vgap = 24 if cols == 1 else 28
-    total_h = 16 + sum(rh for rh, _ in rows_data) + max(0, len(rows_data) - 1) * row_vgap
+    row_vgap = 12
+    total_h = 8 + sum(item[7] for item in prepared) + max(0, total - 1) * row_vgap
 
     parts: list[str] = [
         svg_open(
@@ -2285,151 +2547,197 @@ def _draw_state_map(steps: list[StateMapStep], kind: str, lienzo: Lienzo) -> str
         )
     ]
 
-    cur_y = 8
-    for r_idx, (row_h, chunk) in enumerate(rows_data):
-        for c_idx, (st, step_lns, meta_lns, prob_lns, step_off, meta_off, sep_off) in enumerate(
-            chunk
-        ):
-            global_idx = r_idx * cols + c_idx
-            bx = margin_x + c_idx * (box_w + arrow_gap)
-            by = cur_y
-            prob_flag = "si" if st.has_problem else "no"
+    cur_y = 4
+    arrow_x = margin_x + box_w / 2.0
+    burst_cx = margin_x + box_w + 29.0
+    for idx, (st, step_lns, meta_lns, prob_lns, step_off, meta_off, prob_off, box_h) in enumerate(
+        prepared
+    ):
+        bx = margin_x
+        by = cur_y
+        prob_flag = "si" if st.has_problem else "no"
+        is_burst = kind == "presente" and st.burst is not None
 
-            if st.has_problem:
-                border_col, border_w, border_op = "#ef4444", "2", "1"
-            elif kind == "futuro":
-                border_col, border_w, border_op = "#22c55e", "1.5", "0.75"
-            else:
-                border_col, border_w, border_op = "#3a3a3a", "1.5", "1"
+        if is_burst:
+            fill_col, border_col, border_w = "#fce8e6", "#c5221f", "2"
+            tone = "rojo"
+        elif st.has_problem:
+            fill_col, border_col, border_w = "#fef7e0", "#b06000", "2"
+            tone = "ambar"
+        elif kind == "futuro":
+            fill_col, border_col, border_w = "#e6f4ea", "#137333", "2"
+            tone = "verde"
+        else:
+            fill_col, border_col, border_w = "#ffffff", "#dadce0", "1.5"
+            tone = "neutro"
 
-            parts.append(
-                f'<g data-paso="{global_idx + 1}" data-problema="{prob_flag}">'
-                f'<rect x="{bx}" y="{by}" width="{box_w}" height="{row_h}" rx="8" '
-                f'fill="#1a1a1a" stroke="{border_col}" stroke-opacity="{border_op}" '
-                f'stroke-width="{border_w}"/>'
+        extra_attrs = f' data-tono="{tone}"'
+        if is_burst and st.burst is not None:
+            extra_attrs += f' data-estallido="{esc(st.burst)}"'
+
+        parts.append(
+            f'<g data-paso="{idx + 1}" data-problema="{prob_flag}"{extra_attrs}>'
+            f'<g><rect x="{bx}" y="{by}" width="{box_w}" height="{box_h}" rx="10" '
+            f'fill="{fill_col}" stroke="{border_col}" stroke-width="{border_w}"/>'
+            + svg_text_lines(
+                bx + pad_x, by + step_off, step_lns, step_size, step_lh, "#202124", weight=700
             )
-
-            if st.has_problem:
-                pill_w = 90 if lienzo.ancha else 96
-                pill_h = 19 if lienzo.ancha else 20
-                pill_ty = by + 21.5 if lienzo.ancha else by + 22
-                parts.append(
-                    f'<g><rect x="{bx + 10}" y="{by + 8}" width="{pill_w}" height="{pill_h}" '
-                    f'rx="{fmt(pill_h / 2)}" fill="#ef4444"/>'
-                    + svg_text(
-                        bx + 10 + pill_w / 2,
-                        pill_ty,
-                        "PROBLEMA",
-                        tag_size,
-                        "#ffffff",
-                        weight=700,
-                        anchor="middle",
-                        spacing=0.5,
-                    )
-                    + "</g>"
-                )
-            else:
-                tag_txt = "META OK" if kind == "futuro" else "SIN FALLO"
-                tag_col = "#22c55e" if kind == "futuro" else "#888888"
-                parts.append(
-                    svg_text(bx + pad_x, by + 22, tag_txt, tag_size, tag_col, weight=700, spacing=0.5)
-                )
-
+            + svg_text_lines(
+                bx + pad_x, by + meta_off, meta_lns, meta_size, meta_lh, "#5f6368"
+            )
+        )
+        if prob_lns:
             parts.append(
                 svg_text_lines(
-                    bx + pad_x, by + step_off, step_lns, step_size, step_lh, "#ffffff", weight=700
-                )
-                + svg_text_lines(
-                    bx + pad_x, by + meta_off, meta_lns, meta_size, meta_lh, "#cccccc"
+                    bx + pad_x,
+                    by + prob_off,
+                    prob_lns,
+                    prob_size,
+                    prob_lh,
+                    "#b06000",
+                    weight=600,
                 )
             )
+        parts.append("</g>")
 
-            if st.has_problem and prob_lns:
-                parts.append(
-                    f'<line x1="{bx + 10}" y1="{fmt(by + sep_off)}" '
-                    f'x2="{bx + box_w - 10}" y2="{fmt(by + sep_off)}" '
-                    f'stroke="#ef4444" stroke-opacity="0.6" stroke-width="1" stroke-dasharray="3 2"/>'
-                    + svg_text_lines(
-                        bx + pad_x,
-                        by + sep_off + 16.0,
-                        prob_lns,
-                        prob_size,
-                        prob_lh,
-                        "#ef4444",
-                        weight=600,
-                    )
+        cy = by + box_h / 2.0
+        if is_burst and st.burst is not None:
+            pts = _starburst_points(burst_cx, cy, 20.5, 12.0)
+            parts.append(
+                f'<g data-estallido-marca="{esc(st.burst)}">'
+                f'<polygon points="{pts}" fill="#fbbc04" stroke="#c5221f" stroke-width="2"/>'
+                + svg_text(
+                    burst_cx,
+                    cy + 4.5,
+                    st.burst,
+                    13.0,
+                    "#c5221f",
+                    weight=800,
+                    anchor="middle",
                 )
+                + "</g>"
+            )
+        elif kind == "futuro" and not st.has_problem:
+            parts.append(
+                '<g data-resuelto="si">'
+                + svg_text(
+                    burst_cx,
+                    cy + 7.0,
+                    "✓",
+                    20.0,
+                    "#137333",
+                    weight=800,
+                    anchor="middle",
+                )
+                + "</g>"
+            )
 
-            parts.append("</g>")
+        parts.append("</g>")
 
-            if global_idx + 1 < total:
-                if c_idx + 1 < len(chunk):
-                    ax1 = bx + box_w + 2
-                    ax2 = bx + box_w + arrow_gap - 2
-                    ay = by + row_h // 2
-                    parts.append(
-                        f'<g data-flecha="paso">'
-                        f'<line x1="{ax1}" y1="{ay}" x2="{ax2 - 6}" y2="{ay}" '
-                        f'stroke="#faff69" stroke-width="2"/>'
-                        f'<polygon points="{ax2},{ay} {ax2 - 8},{ay - 4.5} {ax2 - 8},{ay + 4.5}" '
-                        f'fill="#faff69"/>'
-                        f"</g>"
-                    )
-                elif cols == 1:
-                    cx = lienzo.ancho // 2
-                    ay1 = by + row_h + 3
-                    ay2 = by + row_h + row_vgap - 2
-                    parts.append(
-                        f'<g data-flecha="paso">'
-                        f'<line x1="{cx}" y1="{ay1}" x2="{cx}" y2="{ay2 - 6}" '
-                        f'stroke="#faff69" stroke-width="2"/>'
-                        f'<polygon points="{cx},{ay2} {cx - 5},{ay2 - 8} {cx + 5},{ay2 - 8}" '
-                        f'fill="#faff69"/>'
-                        f"</g>"
-                    )
-                else:
-                    mid_gap_y = by + row_h + row_vgap // 2
-                    next_top_y = by + row_h + row_vgap
-                    start_cx = bx + box_w // 2
-                    dest_cx = margin_x + box_w // 2
-                    parts.append(
-                        f'<g data-flecha="paso">'
-                        f'<polyline points="{start_cx},{by + row_h + 2} {start_cx},{mid_gap_y} '
-                        f'{dest_cx},{mid_gap_y} {dest_cx},{next_top_y - 7}" '
-                        f'fill="none" stroke="#faff69" stroke-width="2"/>'
-                        f'<polygon points="{dest_cx},{next_top_y - 1} {dest_cx - 4.5},{next_top_y - 9} '
-                        f'{dest_cx + 4.5},{next_top_y - 9}" fill="#faff69"/>'
-                        f"</g>"
-                    )
+        if idx + 1 < total:
+            ay1 = by + box_h + 1
+            ay2 = by + box_h + row_vgap - 1
+            parts.append(
+                f'<g data-flecha="paso">'
+                f'<line x1="{fmt(arrow_x)}" y1="{ay1}" x2="{fmt(arrow_x)}" y2="{ay2 - 6}" '
+                f'stroke="#5f6368" stroke-width="2"/>'
+                f'<polygon points="{fmt(arrow_x)},{ay2} {fmt(arrow_x - 5)},{ay2 - 8} '
+                f'{fmt(arrow_x + 5)},{ay2 - 8}" fill="#5f6368"/>'
+                f"</g>"
+            )
 
-        cur_y += row_h + row_vgap
+        cur_y += box_h + row_vgap
 
     parts.append("</svg>")
     return "".join(parts)
 
 
+def _render_burst_legend(steps: list[StateMapStep]) -> str:
+    seen: set[tuple[str, str]] = set()
+    items: list[tuple[str, str]] = []
+    for st in steps:
+        if st.burst:
+            key = (st.burst, st.problem_text or st.problem)
+            if key not in seen:
+                seen.add(key)
+                items.append(key)
+    if not items:
+        return ""
+    items.sort(key=lambda pair: pair[0])
+    pts = _starburst_points(0.0, 0.0, 10.5, 6.2)
+    rows: list[str] = []
+    for letra, texto in items:
+        mini_svg = (
+            '<svg class="mini-estallido" width="24" height="24" viewBox="-12 -12 24 24" aria-hidden="true">'
+            f'<polygon points="{pts}" fill="#fbbc04" stroke="#c5221f" stroke-width="1.8"/>'
+            + svg_text(0.0, 3.8, letra, 11.0, "#c5221f", weight=800, anchor="middle")
+            + "</svg>"
+        )
+        rows.append(
+            f'<div class="leyenda-item" data-leyenda-estallido="{esc(letra)}">'
+            f"{mini_svg}<span>{format_inline_md(texto)}</span></div>"
+        )
+    return f'<div class="leyenda-estallidos">{"".join(rows)}</div>'
+
+
 def render_state_map_svg(steps: list[StateMapStep], kind: str) -> str:
     """Dibuja el mapa de estado presente o futuro en variante angosta y ancha."""
-    return draw_variants("diagram-box", lambda lienzo: _draw_state_map(steps, kind, lienzo))
+    mapa_html = draw_variants("diagram-box", lambda lienzo: _draw_state_map(steps, kind, lienzo))
+    if kind == "presente":
+        leyenda = _render_burst_legend(steps)
+        if leyenda:
+            return f"{mapa_html}\n{leyenda}"
+    return mapa_html
 
 
-def render_table_html(table: MarkdownTable) -> str:
-    head_cells = "".join(f"<th>{format_inline_md(h)}</th>" for h in table.headers)
+def render_table_html(table: MarkdownTable, footnotes: list[str] | None = None) -> str:
     plain_headers = [strip_md_inline(h) for h in table.headers]
+    omitted_cols: set[int] = set()
+    if footnotes is not None:
+        fuente_cols = {
+            idx for idx, h in enumerate(plain_headers) if h.strip().lower() == "fuente"
+        }
+        if fuente_cols and len(fuente_cols) < len(table.headers):
+            omitted_cols = fuente_cols
+
+    visible_indices = [idx for idx in range(len(table.headers)) if idx not in omitted_cols]
+    head_cells = "".join(f"<th>{format_inline_md(table.headers[idx])}</th>" for idx in visible_indices)
     is_ishi = is_ishikawa_table(table)
     is_pick = is_pick_table(table)
+    cols_cls = "cols-many" if len(visible_indices) >= 5 else f"cols-{len(visible_indices)}"
     wrap_cls = "table-wrap table-pick" if is_pick else "table-wrap"
     body_rows: list[str] = []
     for row in table.rows:
         padded = row + [""] * max(0, len(table.headers) - len(row))
+        nota_nums: list[int] = []
+        if omitted_cols and footnotes is not None:
+            for col_i in sorted(omitted_cols):
+                raw_nota = padded[col_i].strip()
+                if not raw_nota:
+                    continue
+                nota_html = format_inline_md(raw_nota)
+                if nota_html in footnotes:
+                    num = footnotes.index(nota_html) + 1
+                else:
+                    footnotes.append(nota_html)
+                    num = len(footnotes)
+                if num not in nota_nums:
+                    nota_nums.append(num)
+        sup_html = "".join(
+            f'<sup><a class="nota-ref" href="#nota-{num}">{num}</a></sup>'
+            for num in nota_nums
+        )
+
         rendered_cells: list[str] = []
-        for col_i, c in enumerate(padded[: len(table.headers)]):
+        for vis_pos, col_i in enumerate(visible_indices):
+            c = padded[col_i]
             lbl_attr = f' data-label="{esc(plain_headers[col_i])}"'
+            cell_sup = sup_html if (vis_pos == len(visible_indices) - 1 and sup_html) else ""
             if is_ishi and col_i == 3:
                 st = strip_md_inline(c).upper()
                 cls = "badge-yellow" if st == "FOCO" else "badge-muted"
                 rendered_cells.append(
-                    f'<td{lbl_attr}><span class="badge-pill {cls}">{esc(st)}</span></td>'
+                    f'<td{lbl_attr}><span class="badge-pill {cls}">{esc(st)}</span>{cell_sup}</td>'
                 )
             elif is_pick and col_i == 6:
                 dec = strip_md_inline(c).lower()
@@ -2440,22 +2748,91 @@ def render_table_html(table: MarkdownTable) -> str:
                 else:
                     cls = "badge-muted"
                 rendered_cells.append(
-                    f'<td{lbl_attr}><span class="badge-pill {cls}">{esc(dec)}</span></td>'
+                    f'<td{lbl_attr}><span class="badge-pill {cls}">{esc(dec)}</span>{cell_sup}</td>'
                 )
             else:
-                rendered_cells.append(f"<td{lbl_attr}>{format_inline_md(c)}</td>")
+                rendered_cells.append(f"<td{lbl_attr}>{format_inline_md(c)}{cell_sup}</td>")
         body_rows.append(f'<tr>{"".join(rendered_cells)}</tr>')
     return (
-        f'<div class="{wrap_cls}"><table><thead><tr>{head_cells}</tr></thead>'
+        f'<div class="{wrap_cls}"><table class="{cols_cls}"><thead><tr>{head_cells}</tr></thead>'
         f'<tbody>{"".join(body_rows)}</tbody></table></div>'
     )
 
 
-def render_list_block(list_lines: list[tuple[int, str]]) -> str:
-    """Renderiza listas con hasta dos niveles de sangria."""
+def _render_porques_cadenas(list_lines: list[tuple[int, str]]) -> str:
+    base_indent = min(ind for ind, _ in list_lines)
+    bloques: list[str] = []
+    idx = 0
+    while idx < len(list_lines):
+        _, content = list_lines[idx]
+        sub_items: list[str] = []
+        idx += 1
+        while idx < len(list_lines) and list_lines[idx][0] > base_indent:
+            sub_items.append(list_lines[idx][1])
+            idx += 1
+
+        m_causa = re.match(
+            r"^(?:\*\*)?(Causa\s+[A-Za-z0-9]+(?:\s*\([^)]+\))?)\s*:?\s*(?:\*\*)?\s*:?\s*(.*)$",
+            content.strip(),
+            flags=re.IGNORECASE,
+        )
+        if m_causa:
+            causa_lbl = strip_md_inline(m_causa.group(1)).strip().rstrip(":")
+            hecho_raw = m_causa.group(2).strip()
+            prefijo = f"<b>{esc(causa_lbl)}:</b> "
+        else:
+            prefijo = ""
+            hecho_raw = content.strip()
+
+        pasos_html: list[str] = []
+        if hecho_raw:
+            pasos_html.append(format_inline_md(re.sub(r"\s*->\s*", " → ", hecho_raw)))
+        conclusiones_html: list[str] = []
+
+        for sub in sub_items:
+            m_plt = re.match(
+                r"^(?:\*\*)?Por\s+lo\s+tanto\s*:?\s*(?:\*\*)?\s*:?\s*(.*)$",
+                sub.strip(),
+                flags=re.IGNORECASE,
+            )
+            if m_plt:
+                tail = re.sub(r"\s*->\s*", " → ", m_plt.group(1).strip())
+                conclusiones_html.append(
+                    '<div class="cadena-conclusion">'
+                    f'<span class="por-lo-tanto">Por lo tanto:</span> {format_inline_md(tail)}'
+                    "</div>"
+                )
+                continue
+            if "->" in sub:
+                ans = sub.split("->", 1)[1].strip()
+            else:
+                ans = re.sub(r"^\d+\.\s*", "", sub.strip()).strip()
+            ans = re.sub(r"\s*->\s*", " → ", ans)
+            if ans:
+                pasos_html.append(format_inline_md(ans))
+
+        cadena_txt = " → ".join(pasos_html)
+        bloques.append(
+            '<div class="cadena-bloque">'
+            f'<div class="cadena">{prefijo}{cadena_txt}</div>'
+            f'{"".join(conclusiones_html)}'
+            "</div>"
+        )
+    return f'<div class="cadenas-4b">{"".join(bloques)}</div>'
+
+
+def render_list_block(
+    list_lines: list[tuple[int, str]],
+    *,
+    in_porques: bool = False,
+) -> str:
+    """Renderiza listas con hasta dos niveles de sangria (o cadenas en 4b)."""
     if not list_lines:
         return ""
     base_indent = min(ind for ind, _ in list_lines)
+    if in_porques and any(ind > base_indent for ind, _ in list_lines):
+        return _render_porques_cadenas(list_lines)
+
     items_html: list[str] = []
     idx = 0
     while idx < len(list_lines):
@@ -2484,11 +2861,22 @@ def render_list_block(list_lines: list[tuple[int, str]]) -> str:
     return f"<ul>{''.join(items_html)}</ul>"
 
 
+def _wrap_table_details(summary: str, table: MarkdownTable) -> str:
+    """Envuelve la tabla repetida tras su diagrama en un desplegable cerrado."""
+    return (
+        '<details class="mapa-detalles">'
+        f"<summary>{esc(summary)}</summary>"
+        f"{render_table_html(table, footnotes=None)}"
+        "</details>"
+    )
+
+
 def render_markdown_blocks(
     lines: list[str],
     *,
     doc: A3Document | None = None,
     skip_brecha_line: bool = False,
+    footnotes: list[str] | None = None,
 ) -> str:
     """Convierte lineas de una seccion Markdown a bloques HTML seguros."""
     out: list[str] = []
@@ -2539,7 +2927,9 @@ def render_markdown_blocks(
             ):
                 out.append(render_ishikawa_svg(doc.ishikawa_branches, doc.brecha))
                 ishikawa_drawn = True
-            elif (
+                out.append(_wrap_table_details("Ver tabla del Ishikawa", tbl))
+                continue
+            if (
                 not pick_drawn
                 and doc is not None
                 and doc.pick_options is not None
@@ -2548,11 +2938,17 @@ def render_markdown_blocks(
             ):
                 out.append(render_pick_svg(doc.pick_options))
                 pick_drawn = True
-            elif doc is not None and map_kind == "presente" and doc.present_map is not None:
+                out.append(render_table_html(tbl, footnotes=footnotes))
+                continue
+            if doc is not None and map_kind == "presente" and doc.present_map is not None:
                 out.append(render_state_map_svg(doc.present_map, "presente"))
-            elif doc is not None and map_kind == "futuro" and doc.future_map is not None:
+                out.append(_wrap_table_details("Ver tabla del mapa (presente)", tbl))
+                continue
+            if doc is not None and map_kind == "futuro" and doc.future_map is not None:
                 out.append(render_state_map_svg(doc.future_map, "futuro"))
-            out.append(render_table_html(tbl))
+                out.append(_wrap_table_details("Ver tabla del mapa (futuro)", tbl))
+                continue
+            out.append(render_table_html(tbl, footnotes=footnotes))
             continue
 
         # Lista con vinetas o numerada
@@ -2573,7 +2969,11 @@ def render_markdown_blocks(
                 list_items.append((len(m_cur.group(1)), m_cur.group(2).strip()))
                 i += 1
             if list_items:
-                out.append(render_list_block(list_items))
+                in_porques = bool(
+                    current_h3
+                    and ("4b" in current_h3.lower() or "porqu" in current_h3.lower())
+                )
+                out.append(render_list_block(list_items, in_porques=in_porques))
             continue
 
         # Parrafo normal (con resaltado suave si es declaracion de no aplica o unica opcion)
@@ -2604,7 +3004,126 @@ def render_markdown_blocks(
     return "\n".join(out)
 
 
-def render_section_card(doc: A3Document, sec_num: int) -> str:
+def _parse_brecha_partes(brecha: str) -> tuple[str | None, str, str, str] | None:
+    leida = _lectura_a3().leer_brecha(brecha)
+    if (
+        not leida.cuerpo_canonico
+        or leida.actual is None
+        or leida.meta is None
+        or leida.cuando is None
+    ):
+        return None
+    ind = leida.indicador or None
+    return ind, leida.actual, leida.meta, leida.cuando
+
+
+def render_brecha_html(brecha: str) -> str:
+    """Dibuja la brecha como cuadros ('N de M'), barras (magnitud con misma unidad) o texto."""
+    partes = _parse_brecha_partes(brecha)
+    if partes is None:
+        return (
+            '<div class="brecha-callout" data-brecha-tipo="texto">'
+            '<span class="brecha-label">Brecha en el Gemba</span>'
+            f'<div class="brecha-text">{format_inline_md(brecha)}</div>'
+            "</div>"
+        )
+
+    indicador, actual_txt, meta_txt, cuando_txt = partes
+    ind_limpio = strip_md_inline(indicador) if indicador else ""
+    titulo_html = esc(f"Brecha · {ind_limpio}" if ind_limpio else "Brecha en el Gemba")
+
+    cuadros = _lectura_a3().leer_cuadros_brecha(actual_txt, meta_txt)
+    if cuadros is not None:
+        m_act = cuadros.total
+        n_act = cuadros.n_actual
+        n_met = cuadros.n_meta
+        size_cls = " mini" if m_act > 10 else (" compacto" if m_act > 5 else "")
+        act_cuads: list[str] = []
+        met_cuads: list[str] = []
+        if n_met >= n_act:
+            for idx in range(m_act):
+                if idx < n_act:
+                    act_cuads.append(f'<span class="cuad lleno{size_cls}"></span>')
+                elif idx < n_met:
+                    act_cuads.append(f'<span class="cuad brecha{size_cls}"></span>')
+                else:
+                    act_cuads.append(f'<span class="cuad neutro{size_cls}"></span>')
+                met_cuads.append(
+                    f'<span class="cuad {"lleno" if idx < n_met else "neutro"}{size_cls}"></span>'
+                )
+        else:
+            for idx in range(m_act):
+                if idx < n_met:
+                    act_cuads.append(f'<span class="cuad base{size_cls}"></span>')
+                    met_cuads.append(f'<span class="cuad base{size_cls}"></span>')
+                elif idx < n_act:
+                    act_cuads.append(f'<span class="cuad brecha brecha-sobra{size_cls}"></span>')
+                    met_cuads.append(f'<span class="cuad lleno{size_cls}"></span>')
+                else:
+                    act_cuads.append(f'<span class="cuad neutro{size_cls}"></span>')
+                    met_cuads.append(f'<span class="cuad lleno{size_cls}"></span>')
+
+        return (
+            '<div class="brecha-bloque" data-brecha-tipo="cuadros">'
+            f'<div class="brecha-titulo">{titulo_html}</div>'
+            '<div class="brecha-grid">'
+            '<span class="brecha-fila-lbl">Actual</span>'
+            f'<div class="cuadros-fila">{"".join(act_cuads)}<span class="brecha-val">{esc(cuadros.rotulo_actual)}</span></div>'
+            '<span class="brecha-fila-lbl">Meta</span>'
+            f'<div class="cuadros-fila">{"".join(met_cuads)}<span class="brecha-val">{esc(cuadros.rotulo_meta)}</span></div>'
+            '</div>'
+            f'<div class="brecha-gap">Brecha: {cuadros.brecha_n} de {m_act} · para {esc(cuando_txt)}</div>'
+            '</div>'
+        )
+
+    barras = _lectura_a3().leer_barras_brecha(actual_txt, meta_txt)
+    if barras is not None:
+        v_act = float(barras.valor_actual)
+        v_met = float(barras.valor_meta)
+        max_v = max(v_act, v_met)
+        pct_act = (v_act / max_v) * 100.0
+        pct_met = (v_met / max_v) * 100.0
+        if barras.valor_actual > barras.valor_meta:
+            segs_act = (
+                f'<span class="barra-base" style="width:{pct_met:.1f}%"></span>'
+                f'<span class="barra-brecha" style="width:{pct_act - pct_met:.1f}%"></span>'
+            )
+        elif barras.valor_meta > barras.valor_actual:
+            segs_act = (
+                f'<span class="barra-ok" style="width:{pct_act:.1f}%"></span>'
+                f'<span class="barra-brecha barra-falta" style="width:{pct_met - pct_act:.1f}%"></span>'
+            )
+        else:
+            segs_act = f'<span class="barra-ok" style="width:{pct_act:.1f}%"></span>'
+        segs_met = f'<span class="barra-ok" style="width:{pct_met:.1f}%"></span>'
+        return (
+            '<div class="brecha-bloque" data-brecha-tipo="barras">'
+            f'<div class="brecha-titulo">{titulo_html}</div>'
+            '<div class="brecha-barras">'
+            '<span class="brecha-fila-lbl">Actual</span>'
+            f'<div class="barra-pista">{segs_act}</div>'
+            f'<span class="brecha-val">{esc(barras.rotulo_actual)}</span>'
+            '<span class="brecha-fila-lbl">Meta</span>'
+            f'<div class="barra-pista">{segs_met}</div>'
+            f'<span class="brecha-val">{esc(barras.rotulo_meta)}</span>'
+            '</div>'
+            f'<div class="brecha-gap">Brecha: {esc(barras.rotulo_brecha)} · para {esc(cuando_txt)}</div>'
+            '</div>'
+        )
+
+    return (
+        '<div class="brecha-callout" data-brecha-tipo="texto">'
+        f'<span class="brecha-label">{titulo_html}</span>'
+        f'<div class="brecha-text">{format_inline_md(brecha)}</div>'
+        "</div>"
+    )
+
+
+def render_section_card(
+    doc: A3Document,
+    sec_num: int,
+    footnotes: list[str] | None = None,
+) -> str:
     sec = doc.sections[sec_num]
     orden = doc.stages_order or _construir_orden_etapas(cargar_contrato(1))
     stage_index = {key: idx for idx, (key, _, _) in enumerate(orden)}
@@ -2621,15 +3140,13 @@ def render_section_card(doc: A3Document, sec_num: int) -> str:
 
     inner_parts: list[str] = [f'<h2 class="section-title">{esc(sec.title)}</h2>']
     if sec_num == 2:
-        inner_parts.append(
-            f'<div class="brecha-callout">'
-            f'<span class="brecha-label">Brecha en el Gemba</span>'
-            f'<div class="brecha-text">{format_inline_md(doc.brecha)}</div>'
-            f"</div>"
-        )
+        inner_parts.append(render_brecha_html(doc.brecha))
 
     rendered_body = render_markdown_blocks(
-        sec.raw_lines, doc=doc, skip_brecha_line=(sec_num == 2)
+        sec.raw_lines,
+        doc=doc,
+        skip_brecha_line=(sec_num == 2),
+        footnotes=footnotes,
     )
     if rendered_body:
         inner_parts.append(rendered_body)
@@ -2660,16 +3177,29 @@ def render_html(doc: A3Document) -> str:
             f"{format_inline_md(doc.objective)}</div>"
         )
 
-    left_col = "\n".join(render_section_card(doc, n) for n in (1, 2, 3, 4))
-    right_parts = [render_section_card(doc, n) for n in (5, 6, 7)]
+    footnotes: list[str] = []
+    left_col = "\n".join(render_section_card(doc, n, footnotes=footnotes) for n in (1, 2, 3, 4))
+    right_parts = [render_section_card(doc, n, footnotes=footnotes) for n in (5, 6, 7)]
     if doc.next_steps_lines is not None and has_meaningful_content(doc.next_steps_lines):
         right_parts.append(
             '<section class="section-card section-card-next" data-seccion="siguientes-pasos">'
             '<h2 class="section-title">Siguientes pasos</h2>'
-            f"{render_markdown_blocks(doc.next_steps_lines)}"
+            f"{render_markdown_blocks(doc.next_steps_lines, footnotes=footnotes)}"
             "</section>"
         )
     right_col = "\n".join(right_parts)
+
+    notas_html = ""
+    if footnotes:
+        notas_items = "".join(
+            f'<li id="nota-{idx}">{nota}</li>' for idx, nota in enumerate(footnotes, start=1)
+        )
+        notas_html = (
+            '<section class="notas" data-seccion="notas">'
+            '<h2 class="notas-titulo">Fuentes (Gemba)</h2>'
+            f"<ol>{notas_items}</ol>"
+            "</section>"
+        )
 
     first_line = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
     rest_lines = [
@@ -2693,6 +3223,7 @@ def render_html(doc: A3Document) -> str:
         f'<div class="a3-col">{left_col}</div>',
         f'<div class="a3-col">{right_col}</div>',
         "</div>",
+        notas_html,
         "</main>",
         "</body></html>",
     ]
