@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "_D=\"${TAS_PROJECT_DIR:-${LEAN_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}}\"; if [ -d \"$_D/.tas\" ] || [ -d \"$_D/.lean_observer\" ]; then exec python3 \"${CLAUDE_PLUGIN_ROOT:-.}/scripts/goldfish_sensor.py\" --platform claude --event PostToolUse; else printf '{}\\n'; fi",
+            "command": "_D=\"${TAS_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}\"; if [ -d \"$_D/.tas\" ]; then exec python3 \"${CLAUDE_PLUGIN_ROOT:-.}/scripts/goldfish_sensor.py\" --platform claude --event PostToolUse; else printf '{}\\n'; fi",
             "timeout": 10
           }
         ]
@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "_D=\"${TAS_PROJECT_DIR:-${LEAN_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}}\"; if [ -d \"$_D/.tas\" ] || [ -d \"$_D/.lean_observer\" ]; then exec python3 \"${CLAUDE_PLUGIN_ROOT:-.}/scripts/goldfish_sensor.py\" --platform claude --event PostToolUseFailure; else printf '{}\\n'; fi",
+            "command": "_D=\"${TAS_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}\"; if [ -d \"$_D/.tas\" ]; then exec python3 \"${CLAUDE_PLUGIN_ROOT:-.}/scripts/goldfish_sensor.py\" --platform claude --event PostToolUseFailure; else printf '{}\\n'; fi",
             "timeout": 10
           }
         ]
@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "_D=\"${TAS_PROJECT_DIR:-${LEAN_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}}\"; if [ -d \"$_D/.tas\" ] || [ -d \"$_D/.lean_observer\" ]; then exec python3 \"${CLAUDE_PLUGIN_ROOT:-.}/scripts/goldfish_sensor.py\" --platform claude --event Stop; else printf '{}\\n'; fi",
+            "command": "_D=\"${TAS_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}\"; if [ -d \"$_D/.tas\" ]; then exec python3 \"${CLAUDE_PLUGIN_ROOT:-.}/scripts/goldfish_sensor.py\" --platform claude --event Stop; else printf '{}\\n'; fi",
             "timeout": 10
           }
         ]

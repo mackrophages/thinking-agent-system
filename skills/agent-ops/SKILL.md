@@ -38,14 +38,14 @@ Los 14 principios de Toyota y los 5 principios Lean, con lo que significa cada u
 | :--- | :--- | :--- |
 | **1. Auditoría 5S al Iniciar (Seiri / Seiton)** | • Antes de la primera acción de una sesión compleja, revisa las herramientas activas, servidores MCP conectados y archivos/KIs en tu contexto.<br>• Si detectas herramientas o servidores MCP cargados que NO se usarán en este proyecto, avisa de inmediato:<br>*"🧹 Alerta 5S: Detecto herramientas/contexto inactivo [X] que genera Muda de Inventario. Sugiero desactivarlo para optimizar el flujo."* | Eliminar herramientas inactivas reduce la latencia de cada turno y evita la degradación de atención (*Lost in the Middle*). |
 | **2. Exploración Quirúrgica (Índices y Lecturas Acotadas)** | • Revisa siempre los índices existentes (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, resúmenes de **Knowledge Items (KI)**) antes de explorar desde cero.<br>• Agrupa las búsquedas independientes (`Grep`, `Glob`, `read_file`, `Read`) en una sola llamada paralela.<br>• Lee únicamente los rangos de líneas necesarios (`offset`/`limit` o `StartLine`/`EndLine`) en lugar de volcar archivos gigantes enteros. | Elimina el *Muda de Movimiento* (llamadas secuenciales lentas) y el *Muda de Inventario* en la ventana de contexto. |
-| **3. Regla de Andon: "La Tercera es la Vencida"** | • Si cualquier herramienta, comando de terminal, compilación o test falla **3 veces consecutivas**, **DETÉN LA LÍNEA INMEDIATAMENTE (Tira del Andon)**.<br>• Tienes prohibido ejecutar un 4to intento por fuerza bruta.<br>• Llega con hechos y opciones: los 3 intentos realizados, si te falta contexto (`Missing Parts`) o si la herramienta falla (`Wrong Parts - Designed`), y las opciones que ves con tu recomendación. | Corta los bucles de retrabajo y protege la ventana de contexto de llenarse de trazas de error redundantes. |
+| **3. Regla de Andon: "La Tercera es la Vencida"** | • La regla es la operativa 1 de `rules/AGENTS.md`. Al parar, trae los 3 intentos, si te falta contexto (`Missing Parts`) o falla la herramienta (`Wrong Parts - Designed`), y las opciones con tu recomendación.<br>• **Oscilación:** si el mismo defecto vuelve en 2 rondas seguidas de hacer y revisar, el enfoque no converge. Cámbialo y anota el descartado para que nadie lo repita: `kaizen-cli.py add-kaizen --proceso "<componente>" --muda "Callejón: <enfoque descartado y defecto que volvía>" --poka-yoke "<enfoque nuevo>" --impacto "<cómo se verá si converge>"`. | Corta los bucles de retrabajo, los que repiten un intento y los que oscilan entre dos, y protege la ventana de contexto. |
 | **4. Calidad en la Fuente (Inspección NNVA)** | • Después de realizar cambios, ejecuta siempre una validación rápida y focalizada en el Gemba (test unitario del módulo afectado, linter, navegador o `git diff`). | Garantiza un *First-Time Yield (FTY)* real verificado en el Gemba antes de entregar. |
 
 ---
 
 ## 4. Delegar a Otro Agente
 
-Todo encargo a otro agente o persona sigue el estándar de relevo de [`references/encargo-de-delegacion.md`](references/encargo-de-delegacion.md): encargo, devolución antes de ejecutar y, si falla lo delegado, revisión primero del encargo.
+Todo encargo a otro agente o persona sigue el estándar de relevo de [`references/encargo-de-delegacion.md`](references/encargo-de-delegacion.md).
 
 ---
 

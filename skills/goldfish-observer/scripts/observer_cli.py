@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 observer_cli.py: Herramienta determinista del Observador Silencioso Goldfish (Lean AgentOps).
-Gestiona `.tas/` en un proyecto (durante una versión lee `.lean_observer/` si falta `.tas/`):
-- `init`: Inicializa `.tas/`, tablero Markdown y HTML interactivo (bloquea directorios personales por Poka-Yoke) y migra `.lean_observer/` si no hay corrida abierta.
+Gestiona `.tas/` en un proyecto:
+- `init`: Inicializa `.tas/`, tablero Markdown y HTML interactivo (bloquea directorios personales por Poka-Yoke).
 - `start-build`: Inicia una corrida (Build) explícita sin detener el reloj entre turnos.
 - `close-build`: Cierra la corrida activa, analiza el transcript fuera de banda (si existe) y actualiza ambos tableros.
 - `update-board`: Sincroniza `READINESS_BOARD.md` y `dashboard/index.html` escapando JSON/HTML contra XSS.
@@ -642,29 +642,18 @@ def update_board_files(obs_dir: Path) -> tuple[Path, Path]:
 
 
 def ensure_gitignore_entry(project_dir: Path) -> None:
-    """Deja una sola línea `.tas/active_build.json`; sustituye en su sitio la de `.lean_observer/` si estaba."""
+    """Deja una sola línea `.tas/active_build.json` en el `.gitignore` del proyecto."""
     gi = project_dir / ".gitignore"
     entry = f"{sensor.CARPETA_OBSERVADOR}/active_build.json"
-    old_entry = f"{sensor.CARPETA_OBSERVADOR_VIEJA}/active_build.json"
     if not gi.exists():
         gi.write_text(f"{entry}\n", encoding="utf-8")
         return
     txt = gi.read_text(encoding="utf-8")
-    lines = txt.splitlines()
-    if old_entry in lines:
-        pos = lines.index(old_entry)
-        ya_estaba = entry in lines
-        lines = [ln for ln in lines if ln != old_entry]
-        if not ya_estaba:
-            lines.insert(pos, entry)
-        txt = "\n".join(lines) + "\n"
-    elif entry in lines:
+    if entry in txt.splitlines():
         return
-    else:
-        if not txt.endswith("\n"):
-            txt += "\n"
-        txt += f"{entry}\n"
-    gi.write_text(txt, encoding="utf-8")
+    if not txt.endswith("\n"):
+        txt += "\n"
+    gi.write_text(f"{txt}{entry}\n", encoding="utf-8")
 
 
 def is_personal_home_dir(raw_dir: Path, resolved_dir: Path) -> bool:
@@ -709,39 +698,17 @@ def cmd_init(args: SimpleNamespace) -> int:
         )
         return 2
 
-    # Tabla de estados de init: la carpeta nueva manda; la vieja se migra solo sin corrida abierta.
     obs_dir = sensor.resolver_carpeta_observador(project_dir)
-    old_name = sensor.CARPETA_OBSERVADOR_VIEJA
-    new_name = sensor.CARPETA_OBSERVADOR
-    old_dir = project_dir / old_name
-    migrated = False
-    if obs_dir.name == old_name:
-        if (obs_dir / "active_build.json").exists():
-            print(
-                f"[PARAR LÍNEA] Hay una corrida abierta en {old_name}/ (active_build.json). "
-                "Ciérrala con close-build y vuelve a correr init.",
-                file=sys.stderr,
-            )
-            return 2
-        obs_dir = obs_dir.rename(project_dir / new_name)
-        migrated = True
-    elif old_dir.is_dir():
-        print(f"[AVISO] También existe {old_name}/: no se usa ni se toca. Revísala y bórrala a mano.", file=sys.stderr)
     (obs_dir / "dashboard").mkdir(parents=True, exist_ok=True)
     (obs_dir / "jugadas").mkdir(parents=True, exist_ok=True)
 
-    # Copiar el sensor a la carpeta del observador para compatibilidad local (reemplaza la copia vieja al migrar)
+    # Copiar el sensor a la carpeta del observador para compatibilidad local
     if SENSOR_SCRIPT.exists():
         dst_sensor = obs_dir / "goldfish_sensor.py"
         shutil.copyfile(SENSOR_SCRIPT, dst_sensor)
         dst_sensor.chmod(0o755)
 
     board_state = load_board_state(obs_dir)
-    if migrated:
-        for jugada in board_state.get("jugadas", []):
-            ruta = jugada.get("file") if isinstance(jugada, dict) else None
-            if isinstance(ruta, str) and ruta.startswith(f"{old_name}/"):
-                jugada["file"] = f"{new_name}/" + ruta[len(old_name) + 1:]
     if args.project_name:
         board_state["projectTitle"] = f"Pre-Production Board: Readiness ({args.project_name})"
     board_state["standardMinutes"] = float(args.standard_min)
@@ -750,8 +717,6 @@ def cmd_init(args: SimpleNamespace) -> int:
 
     ensure_gitignore_entry(project_dir)
     md_path, html_path = update_board_files(obs_dir)
-    if migrated:
-        print(f"[OK] Carpeta del observador migrada de {old_name}/ a {new_name}/ en: {project_dir}")
     print(f"[OK] Observador Goldfish inicializado en: {obs_dir}")
     print(f"  - Tablero Markdown: {md_path}")
     print(f"  - Tablero HTML:     {html_path}")
@@ -974,7 +939,7 @@ def cmd_create_jugada(args: SimpleNamespace) -> int:
 def resolve_goldfish_artefacto(obs_dir: Path, cli_artefacto: str | None) -> str:
     if cli_artefacto is not None and cli_artefacto.strip():
         return cli_artefacto.strip()
-    env_artefacto = sensor.leer_env("TAS_GOLDFISH_ARTEFACTO", "LEAN_GOLDFISH_ARTEFACTO")
+    env_artefacto = sensor.leer_env("TAS_GOLDFISH_ARTEFACTO")
     if env_artefacto:
         return env_artefacto
     return str(obs_dir / "goldfish-board.json")
@@ -988,7 +953,7 @@ def cmd_prepare_goldfish(args: SimpleNamespace) -> int:
         print(f"[PARAR LÍNEA] No existe traza para observar en: {trace_file}", file=sys.stderr)
         return 1
 
-    despacho_tpl = sensor.leer_env("TAS_GOLDFISH_DESPACHO", "LEAN_GOLDFISH_DESPACHO")
+    despacho_tpl = sensor.leer_env("TAS_GOLDFISH_DESPACHO")
     encargo_path = (
         Path(args.output_encargo).resolve()
         if args.output_encargo

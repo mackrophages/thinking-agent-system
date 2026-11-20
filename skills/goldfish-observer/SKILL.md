@@ -38,7 +38,6 @@ El **Observador Silencioso (Goldfish)** opera sin estado previo ni juicio puniti
 Variables de entorno del despacho remoto:
 - `TAS_GOLDFISH_DESPACHO`: plantilla del comando remoto con `{encargo}` y `{artefacto}` citados para la shell.
 - `TAS_GOLDFISH_ARTEFACTO`: ruta del JSON del revisor; por defecto `.tas/goldfish-board.json` (`--artefacto` manda).
-- Compatibilidad (una versión): si falta o está vacía una `TAS_*`, se lee la anterior (`LEAN_GOLDFISH_DESPACHO`, `LEAN_GOLDFISH_ARTEFACTO`, `LEAN_PROJECT_DIR`, `LEAN_STANDARD_MIN`, `LEAN_TAKT_MIN`, `LEAN_AUTO_CLOSE_ON_STOP`); `.lean_observer/` sigue funcionando e `init` la migra a `.tas/` sin corrida abierta.
 
 > **Regla de Oro ("Deriva primero, compara después"):** Pasa solo la traza cruda (`gemba_trace.jsonl` y extractos de herramientas), sin opinión ni resumen del Elefante.
 

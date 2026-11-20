@@ -111,106 +111,14 @@ tas/
 
 ## Instalación
 
-Manual de uso, de la instalación a un caso completo: [`docs/manual.md`](./docs/manual.md). Cambios de la versión 2.2.0 y migración: [`CHANGELOG.md`](./CHANGELOG.md).
-
-El repositorio público es `thinking-agent-system` (`https://github.com/mackrophages/thinking-agent-system`). En los bloques siguientes, `<ruta-a-tas>` es la carpeta donde clonaste o copiaste este repositorio.
-
-### 1. En Claude Code
+El repositorio público es `thinking-agent-system` (`https://github.com/mackrophages/thinking-agent-system`). En Claude Code, con `<ruta-a-tas>` como la carpeta donde lo clonaste:
 
 ```bash
 claude plugin marketplace add <ruta-a-tas>
 claude plugin install tas@tas
 ```
-O cárgalo en una sesión puntual con:
-```bash
-claude --plugin-dir <ruta-a-tas>
-```
-En Claude Code cada skill se invoca con el nombre del plugin delante (`/tas:a3`, `/tas:5-porques`, `/tas:agent-ops`, `/tas:gemba`, `/tas:goldfish-observer`, `/tas:kaizen`, `/tas:ojos-frescos`).
 
-### 2. En Antigravity (`agy`)
-
-Antigravity expone cada skill con el campo `name` de su `SKILL.md`, sin anteponer el nombre del plugin. Por ello se instala generando copias `tas-*` (en `~/.gemini/config/plugins/tas` de forma global o en `.agents/plugins/tas` por proyecto) que reescriben el nombre y las rutas internas:
-
-```bash
-REPO=<ruta-a-tas>
-DEST_PLUGIN="$HOME/.gemini/config/plugins/tas"  # o .agents/plugins/tas por proyecto
-rm -rf "$DEST_PLUGIN"
-mkdir -p "$DEST_PLUGIN/skills"
-cp -r "$REPO/plugin.json" "$REPO/hooks.json" "$REPO/LICENSE" "$REPO/README.md" \
-      "$REPO/rules" "$REPO/agents" "$REPO/scripts" "$DEST_PLUGIN/"
-for s in a3 5-porques agent-ops gemba goldfish-observer kaizen ojos-frescos; do
-  cp -r "$REPO/skills/$s" "$DEST_PLUGIN/skills/tas-$s"
-  sed -i "s/^name: $s\$/name: tas-$s/" "$DEST_PLUGIN/skills/tas-$s/SKILL.md"
-done
-python3 - "$DEST_PLUGIN" <<'PY'
-import pathlib, sys
-root = pathlib.Path(sys.argv[1])
-skills = ("a3", "5-porques", "agent-ops", "gemba", "goldfish-observer", "kaizen", "ojos-frescos")
-archivos = [root / "rules/AGENTS.md", *root.glob("agents/*.md"), *root.glob("skills/tas-*/**/*.md")]
-for p in archivos:
-    txt = p.read_text(encoding="utf-8")
-    for s in skills:
-        txt = txt.replace(f"skills/{s}/", f"skills/tas-{s}/").replace(f"`{s}`", f"`tas-{s}`")
-    p.write_text(txt, encoding="utf-8")
-PY
-agy plugin validate "$DEST_PLUGIN"
-```
-
-### 3. En OpenCode
-
-OpenCode tampoco antepone el nombre del plugin, así que usa copias generadas `tas-*` junto con `scripts/` para el observador:
-
-**Global (`~/.config/opencode/`):**
-```bash
-REPO=<ruta-a-tas>
-DEST_OC="$HOME/.config/opencode"
-mkdir -p "$DEST_OC/skills"
-rm -rf "$DEST_OC"/skills/tas-* "$DEST_OC/scripts"
-cp -r "$REPO/scripts" "$DEST_OC/scripts"
-for s in a3 5-porques agent-ops gemba goldfish-observer kaizen ojos-frescos; do
-  cp -r "$REPO/skills/$s" "$DEST_OC/skills/tas-$s"
-  sed -i "s/^name: $s\$/name: tas-$s/" "$DEST_OC/skills/tas-$s/SKILL.md"
-done
-{
-  printf '<!-- TAS v2.2.0: reglas siempre activas, copia de rules/AGENTS.md del plugin -->\n\n'
-  cat "$REPO/rules/AGENTS.md"
-} > "$DEST_OC/AGENTS.md"
-python3 - "$DEST_OC" <<'PY'
-import pathlib, sys
-root = pathlib.Path(sys.argv[1])
-skills = ("a3", "5-porques", "agent-ops", "gemba", "goldfish-observer", "kaizen", "ojos-frescos")
-archivos = [root / "AGENTS.md", *root.glob("skills/tas-*/**/*.md")]
-for p in archivos:
-    txt = p.read_text(encoding="utf-8")
-    for s in skills:
-        txt = txt.replace(f"skills/{s}/", f"skills/tas-{s}/").replace(f"`{s}`", f"`tas-{s}`")
-    p.write_text(txt, encoding="utf-8")
-PY
-```
-
-**Por proyecto (`.opencode/` y `opencode.json` con `"instructions": ["reglas-tas.md"]`):**
-```bash
-REPO=<ruta-a-tas>
-mkdir -p .opencode/skills .opencode/agents
-rm -rf .opencode/skills/tas-* .opencode/scripts
-cp -r "$REPO/scripts" .opencode/scripts
-for s in a3 5-porques agent-ops gemba goldfish-observer kaizen ojos-frescos; do
-  cp -r "$REPO/skills/$s" ".opencode/skills/tas-$s"
-  sed -i "s/^name: $s\$/name: tas-$s/" ".opencode/skills/tas-$s/SKILL.md"
-done
-cp "$REPO"/agents/*.md .opencode/agents/
-cp "$REPO/rules/AGENTS.md" reglas-tas.md
-python3 - <<'PY'
-import pathlib
-skills = ("a3", "5-porques", "agent-ops", "gemba", "goldfish-observer", "kaizen", "ojos-frescos")
-archivos = [pathlib.Path("reglas-tas.md"), *pathlib.Path(".opencode/agents").glob("*.md"), *pathlib.Path(".opencode/skills").glob("tas-*/**/*.md")]
-for p in archivos:
-    txt = p.read_text(encoding="utf-8")
-    for s in skills:
-        txt = txt.replace(f"skills/{s}/", f".opencode/skills/tas-{s}/").replace(f"`{s}`", f"`tas-{s}`")
-    p.write_text(txt, encoding="utf-8")
-PY
-```
+Antigravity y OpenCode necesitan copias `tas-*` de los skills. Los pasos de las tres plataformas, y cómo comprobar que quedó cargado, están en la [sección 2 del manual](./docs/manual.md#2-instalación-y-comprobación); los cambios de cada versión y cómo migrar, en [`CHANGELOG.md`](./CHANGELOG.md).
 
 ---
 

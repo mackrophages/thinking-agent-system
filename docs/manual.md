@@ -2,7 +2,7 @@
 
 Este manual es para quien instala TAS por primera vez y quiere usarlo en su trabajo de todos los días. No hace falta haber leído nada antes. Va de lo simple a lo completo: qué es, cómo se instala, un caso entero de principio a fin, cada pieza por separado y qué hacer cuando algo falla.
 
-Los bloques de comandos marcados como ejecutables se probaron de verdad contra la versión 2.2.0. Corren tal cual, en una carpeta vacía, si defines antes la variable `TAS_REPO`.
+Los bloques de comandos marcados como ejecutables se probaron de verdad contra la versión 2.3.0. Corren tal cual, en una carpeta vacía, si defines antes la variable `TAS_REPO`.
 
 ## 1. Qué es TAS y qué cambia al instalarlo
 TAS (*Thinking Agent System*) es un plugin libre en español para agentes de código (Claude Code, Antigravity y OpenCode). Le enseña al agente a trabajar con el método Lean AgentOps: parar cuando algo falla, ir a mirar el lugar real antes de afirmar, pensar en una página antes de construir y dejar por escrito lo que se aprendió.
@@ -10,7 +10,7 @@ TAS (*Thinking Agent System*) es un plugin libre en español para agentes de có
 Al instalarlo cambian tres cosas:
 1. **El agente arranca con reglas siempre activas.** Son un archivo corto (`rules/AGENTS.md`) que se carga entero en cada sesión. Las que más notarás:
    - **Gemba antes de afirmar:** no dice "está listo" sin haberlo visto en el lugar real (la salida de un comando, el archivo abierto, la página renderizada); lo que no pudo comprobar lo marca `[SIN CONFIRMAR]`.
-   - **Andon al tercer fallo:** si una herramienta falla tres veces seguidas, se detiene y te llega con hechos y opciones.
+   - **Andon al tercer fallo:** si una herramienta falla tres veces seguidas, se detiene y te llega con hechos y opciones. Si el mismo defecto vuelve en dos rondas seguidas, cambia de enfoque y anota el intento descartado.
    - **Nada oculto:** no comenta pruebas que fallan ni debilita aserciones, y nombra lo que falló y lo que quedó fuera.
    - **Se culpa al proceso, no a la persona ni al agente**, y la entrega empieza por si se cumplió el criterio de aceptación.
 2. **El agente gana siete skills.** Un skill es un procedimiento que el agente carga cuando la tarea lo pide (sección 4).
@@ -76,7 +76,7 @@ for s in a3 5-porques agent-ops gemba goldfish-observer kaizen ojos-frescos; do
   cp -r "$TAS_REPO/skills/$s" "$DEST_OC/skills/tas-$s"
   sed -i "s/^name: $s\$/name: tas-$s/" "$DEST_OC/skills/tas-$s/SKILL.md"
 done
-{ printf '<!-- TAS v2.2.0: reglas siempre activas, copia de rules/AGENTS.md del plugin -->\n\n'
+{ printf '<!-- TAS: reglas siempre activas, copia de rules/AGENTS.md del plugin -->\n\n'
   cat "$TAS_REPO/rules/AGENTS.md"; } > "$DEST_OC/AGENTS.md"
 python3 - "$DEST_OC" <<'PY'
 import pathlib, sys
@@ -468,7 +468,7 @@ test "$rc" -eq 2
 
 ### 4.6 `agent-ops`
 - **Cuándo:** al empezar una sesión de trabajo y al delegar a otro agente o a una persona.
-- **Qué entrega:** el estándar de trabajo del agente (revisar el contexto al iniciar, explorar con índices y lecturas acotadas, Andon al tercer fallo, probar después de cada cambio), las fórmulas honestas de las métricas y el formato de **encargo y devolución** para delegar: contexto, meta, brecha, criterio de aceptación, salida esperada, qué no tocar y qué hacer si falta algo; y quien recibe responde antes de ejecutar qué entendió, cómo lo hará, cuánto cuesta y qué no es viable. Está en `references/encargo-de-delegacion.md`. Si algo delegado sale mal, se revisa primero el encargo.
+- **Qué entrega:** el estándar de trabajo del agente (revisar el contexto al iniciar, explorar con índices y lecturas acotadas, Andon al tercer fallo, probar después de cada cambio), las fórmulas honestas de las métricas y el formato de **encargo y devolución** para delegar, en `references/encargo-de-delegacion.md`: el encargo cita textual el pedido del dueño y no lleva el diseño de quien delega; quien recibe devuelve antes de ejecutar qué entendió y anota su latido en `progreso.md`; entre rondas, los pendientes abiertos se cierran solo con evidencia; y si algo delegado sale mal, se revisa primero el encargo.
 - **Comandos:** ninguno propio; mide con el observador (sección 6).
 
 ### 4.7 `goldfish-observer`
@@ -607,7 +607,6 @@ Para el despacho remoto se usan **dos variables de entorno**:
 
 - `TAS_GOLDFISH_DESPACHO`: la plantilla del comando que envía el encargo a tu revisor remoto, con `{encargo}` y `{artefacto}` como huecos.
 - `TAS_GOLDFISH_ARTEFACTO`: la ruta donde el revisor escribirá su JSON. Si falta, se usa `.tas/goldfish-board.json`. La opción `--artefacto` manda sobre la variable.
-- **Nota de compatibilidad (una versión):** cuando falta o está vacía una variable `TAS_*`, se lee la anterior (`LEAN_PROJECT_DIR`, `LEAN_STANDARD_MIN`, `LEAN_TAKT_MIN`, `LEAN_AUTO_CLOSE_ON_STOP`, `LEAN_GOLDFISH_DESPACHO` y `LEAN_GOLDFISH_ARTEFACTO`); las carpetas `.lean_observer/` existentes siguen funcionando y `observer_cli.py init` las migra a `.tas/` si no hay corrida abierta (`active_build.json`).
 
 El comando de ejemplo `revisor-remoto` es inventado: pon el tuyo. `prepare-goldfish` **imprime** el comando ya con los huecos llenos; no lo ejecuta, lo copias y lo corres tú:
 <!-- ejecutable -->

@@ -8,8 +8,6 @@ Principios y Poka-Yokes implementados:
 1. Opcional por proyecto (Poka-Yoke): si el directorio del proyecto no contiene
    `.tas/` (creado con `observer_cli.py init`), el sensor no hace nada
    y sale con `{}` (código 0). Nunca ensucia `/root` ni directorios no instrumentados.
-   Compatibilidad durante una versión: si falta `.tas/` se usa `.lean_observer/`,
-   y cada variable `TAS_*` cae a su `LEAN_*` si falta o está vacía.
 2. Señales de error documentadas:
    - En Claude Code: evento `PostToolUseFailure` (campo `error`), o `tool_response`
      objeto con `is_error: true` / `interrupted: true` / `exit_code != 0`.
@@ -46,29 +44,17 @@ READ_TOOLS = {
 }
 
 CARPETA_OBSERVADOR = ".tas"
-CARPETA_OBSERVADOR_VIEJA = ".lean_observer"
 
 
-def leer_env(nueva: str, vieja: str, defecto: str = "") -> str:
-    """Devuelve la variable nueva si está definida y no vacía; si no, la vieja; si no, el defecto."""
-    v = os.environ.get(nueva)
-    if v is not None and v.strip() != "":
-        return v.strip()
-    v_old = os.environ.get(vieja)
-    if v_old is not None and v_old.strip() != "":
-        return v_old.strip()
-    return defecto
+def leer_env(nombre: str, defecto: str = "") -> str:
+    """Devuelve la variable si está definida y no vacía; si no, el defecto."""
+    valor = os.environ.get(nombre, "").strip()
+    return valor or defecto
 
 
 def resolver_carpeta_observador(project_dir: Path) -> Path:
-    """Carpeta del observador: `.tas` si existe; si no, `.lean_observer` si existe; si no, `.tas`."""
-    nueva = project_dir / CARPETA_OBSERVADOR
-    if nueva.is_dir():
-        return nueva
-    vieja = project_dir / CARPETA_OBSERVADOR_VIEJA
-    if vieja.is_dir():
-        return vieja
-    return nueva
+    """Carpeta del observador del proyecto."""
+    return project_dir / CARPETA_OBSERVADOR
 
 
 def resolve_project_dir(cli_project_dir: str | None, payload: dict[str, Any]) -> Path:
@@ -80,7 +66,7 @@ def resolve_project_dir(cli_project_dir: str | None, payload: dict[str, Any]) ->
     ws_paths = payload.get("workspacePaths") or payload.get("workspace_paths")
     if isinstance(ws_paths, list) and ws_paths and isinstance(ws_paths[0], str) and ws_paths[0].strip():
         return Path(ws_paths[0].strip()).resolve()
-    env_dir = leer_env("TAS_PROJECT_DIR", "LEAN_PROJECT_DIR", os.environ.get("CLAUDE_PROJECT_DIR", "").strip())
+    env_dir = leer_env("TAS_PROJECT_DIR", os.environ.get("CLAUDE_PROJECT_DIR", "").strip())
     if env_dir:
         return Path(env_dir).resolve()
     return Path.cwd().resolve()
@@ -426,13 +412,13 @@ def main() -> int:
     project_dir = resolve_project_dir(args.project_dir, payload)
     obs_dir = resolver_carpeta_observador(project_dir)
 
-    # Poka-Yoke: si el proyecto no tiene .tas/ (ni la carpeta vieja) inicializado, no hacer nada
+    # Poka-Yoke: si el proyecto no tiene .tas/ inicializado, no hacer nada
     if not obs_dir.is_dir():
         print("{}")
         return 0
 
-    standard_min = float(leer_env("TAS_STANDARD_MIN", "LEAN_STANDARD_MIN", "5.0"))
-    takt_min = float(leer_env("TAS_TAKT_MIN", "LEAN_TAKT_MIN", "7.0"))
+    standard_min = float(leer_env("TAS_STANDARD_MIN", "5.0"))
+    takt_min = float(leer_env("TAS_TAKT_MIN", "7.0"))
     now_wall = time.time()
     now_mono = time.monotonic()
 
@@ -534,7 +520,7 @@ def main() -> int:
 
         write_or_update_trace_record(obs_dir, state, now_wall, now_mono, standard_min, takt_min, note=args.note)
 
-        auto_close = args.close_on_stop or (leer_env("TAS_AUTO_CLOSE_ON_STOP", "LEAN_AUTO_CLOSE_ON_STOP") == "1")
+        auto_close = args.close_on_stop or (leer_env("TAS_AUTO_CLOSE_ON_STOP") == "1")
         if auto_close:
             active_path.unlink(missing_ok=True)
 

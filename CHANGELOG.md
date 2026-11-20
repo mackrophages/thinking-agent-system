@@ -6,6 +6,30 @@ El repositorio público `thinking-agent-system` nace en la versión **2.0.0** co
 
 ---
 
+## [2.3.0] - 2026-11-20
+
+### Delegar entre rondas sin perder el hilo
+
+Inspirado en el modo de equipo de Antigravity y adaptado: el orquestador sigue siendo quien delega; lo que cambia es el estándar del relevo.
+
+- **Pedido original textual:** el encargo trae un campo nuevo con las palabras del dueño citadas, no resumidas. Resumir la decisión del dueño cuenta como diseño propio de quien delega, y el encargo no lo lleva: lleva la decisión textual, los hechos observados y el criterio, y el cómo lo propone quien recibe (`encargo-de-delegacion.md`, regla 1; principio 9 de `rules/AGENTS.md`).
+- **Pendientes abiertos entre rondas:** en trabajo de varias rondas, quien delega lleva la lista de lo que cada entrega dejó sin resolver o sin verificar, tal como se anotó, y la pasa a la ronda siguiente. Un pendiente se cierra solo con evidencia: **el silencio no es resolución** (regla 5).
+- **Latido:** en un trabajo de más de unos minutos, quien recibe anota en `progreso.md` la hora y el paso al terminar cada paso, y en un comando largo al menos cada 5 minutos (regla 6).
+- **Oscilación:** si el mismo defecto vuelve en 2 rondas seguidas, no se parcha igual: se cambia de enfoque y el descartado se anota como callejón en `KAIZEN.md` con `kaizen-cli.py add-kaizen` y la muda empezando por `Callejón:`, para que nadie lo repita (operativa 1 de `rules/AGENTS.md`; detalle en `agent-ops`).
+
+### Sin repeticiones ni bloques vencidos
+
+- **Fin de la compatibilidad con `lean-kit`:** la 2.0.0 prometió leer `.lean_observer/` y las variables `LEAN_*` durante una versión, y ya pasaron dos. El sensor, `observer_cli.py` (incluida la migración de `init`) y los dos `hooks.json` solo leen `.tas/` y `TAS_*`. Un proyecto que todavía tenga `.lean_observer/` se renombra a mano a `.tas/` con la corrida cerrada.
+- **`rules/AGENTS.md` no creció** (4,867 a 4,839 bytes): las dos reglas nuevas se compensaron acortando cuatro remisiones; la del formato del encargo apunta a `agent-ops`, que resuelve en las tres plataformas.
+- **Una sola fuente para cada cosa:** el Andon de `agent-ops` remite a la operativa 1 en vez de copiarla; la instalación del README remite a la sección 2 del manual, que es la que se prueba; el manual resume el formato del encargo en vez de enumerar sus campos; y la copia de las reglas para OpenCode ya no lleva un número de versión que haya que cambiar en cada entrega.
+
+### Compatibilidad y adopción
+
+- Los encargos escritos con la 2.2.0 siguen sirviendo: los campos nuevos son para trabajo de varias rondas.
+- Contratos del A3 sin cambios.
+
+---
+
 ## [2.2.0] - 2026-11-15
 
 ### El A3 se lee como una historia en una hoja
